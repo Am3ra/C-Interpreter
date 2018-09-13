@@ -24,4 +24,4 @@ part       | term [+term][-term]
 term       | factor[\*factor][/factor][%factor]
 factor     | part[rel-op part]
 part       | [+ or -] atom
-atom n     | variable, constannt, function, or expression
+atom       | variable, constannt, function, or expression
