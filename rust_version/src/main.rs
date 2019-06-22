@@ -1,6 +1,8 @@
-use std::env;
-use std::fs;
+mod parser;
 
-
-fn main() {
+fn main()-> Result<(), String> {
+    loop {
+        println!("{}", parser::parse_line()?);
+    }
+    
 }
