@@ -1,1 +1,0 @@
-/Users/alan/Documents/C-Interpreter/rust_version/target/debug/rust_version.dSYM: /Users/alan/Documents/C-Interpreter/rust_version/src/main.rs /Users/alan/Documents/C-Interpreter/rust_version/src/parser.rs
