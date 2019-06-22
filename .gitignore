@@ -1,1 +1,2 @@
-rust_version/target
+rust_version/target/*
+rust_version/target/rls/debug/deps/save-analysis/rust_version-07cafba00aa7800b.json

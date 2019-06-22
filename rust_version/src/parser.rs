@@ -11,10 +11,11 @@ pub fn parse_line<'a>() -> Result<String, Box<error::Error>> {
 
     let token_vector : Vec<&'a str> = parse_tokens(buffer)?;
 
-    Ok("All Correct!".into())
+    Ok("All Correct!".into());
 }
 
 fn parse_tokens<'a>(buffer : String)-> Result<Vec<&'a str>,String>{
+    let buffer = buffer.chars();
 
     Err("Error parsing tokensd".into())
 }
