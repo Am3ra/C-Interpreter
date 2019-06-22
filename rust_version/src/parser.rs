@@ -17,6 +17,7 @@ pub fn parse_line<'a>() -> Result<String, Box<error::Error>> {
 fn parse_tokens<'a>(buffer : String)-> Result<Vec<&'a str>,String>{
     let buffer = buffer.chars();
 
+    
     Err("Error parsing tokensd".into())
 }
 
