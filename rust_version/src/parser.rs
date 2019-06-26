@@ -30,6 +30,13 @@ pub struct Interpreter {
     // current_char : Option<char>
 }
 
+
+struct ASTreeNode{
+    left : Token,
+    right : Token,
+    value : Token
+}
+
 impl Interpreter {
     
     fn digit(& mut self)->Token{
