@@ -22,23 +22,14 @@ enum MulOp{
     MODU
 }
 
-pub struct Interpreter {
+struct Lexer{
     input: Vec<char>,
     position: usize,
     current_token: Token,
     len : usize
-    // current_char : Option<char>
 }
 
-
-struct ASTreeNode{
-    left : Token,
-    right : Token,
-    value : Token
-}
-
-impl Interpreter {
-    
+impl Lexer{
     fn digit(& mut self)->Token{
         let mut number_so_far = String::new();
 
@@ -50,7 +41,7 @@ impl Interpreter {
         return Token::DIGIT(number_so_far.parse().unwrap());
     }
 
-    fn get_next_token(&mut self) {
+    pub fn get_next_token(&mut self) {
         if self.position >= self.len {
             return self.current_token= Token::EOF;
         }
@@ -80,42 +71,61 @@ impl Interpreter {
 
     }
 
-
-    pub fn new(input: &str) -> Result<Interpreter,String> {
+    pub fn new(input: &str) -> Result<Lexer,String> {
         if input.len()<1 {
             return Err("Must have lenght".into())
         }
         let input :Vec<char> = input.trim().chars().collect();
-        Ok(Interpreter {
+        Ok(Lexer {
             len: input.len(),
             input,
             position: 0,
             current_token: Token::EOF,
-            // current_char : None
         })
     }
+}
+
+pub struct Interpreter {
+    lexer: Lexer,
+}
+
+
+struct _ASTreeNode{
+    left : Token,
+    right : Token,
+    value : Token   
+}
+
+impl Interpreter {
+
+    pub fn new(input: &str)->Result<Interpreter,String>{
+        Ok(Interpreter{
+            lexer: Lexer::new(input)?
+        })
+    }
+    
 
     fn atom(&mut self)-> Result<u32, String>{
-        match self.current_token{
+        match self.lexer.current_token{
             Token::DIGIT(i)=>{
-                self.get_next_token();
+                self.lexer.get_next_token();
                 Ok(i)
                 },
             Token::LPAREN=> {
                 let result = self.expr();
-                match self.current_token{
+                match self.lexer.current_token{
                     Token::RPAREN=> {
-                        self.get_next_token();
+                        self.lexer.get_next_token();
                         result
                     },
                     _=>{
-                        println!("Current TOK ERR, {:?}", self.current_token);
+                        println!("Current TOK ERR, {:?}", self.lexer.current_token);
                         Err("Expected ')'".into())
                     }
                 }
             },
             _=>{
-                println!("Current TOK ERR, {:?}", self.current_token);
+                println!("Current TOK ERR, {:?}", self.lexer.current_token);
                 Err("Expected digit".into())
                 }
         }
@@ -123,8 +133,8 @@ impl Interpreter {
 
     fn term(&mut self)-> Result<u32,String>{
         let mut result = self.atom()?;
-        while let Token::MULOP(i) = self.current_token.clone(){
-            self.get_next_token();
+        while let Token::MULOP(i) = self.lexer.current_token.clone(){
+            self.lexer.get_next_token();
             match i{
                 MulOp::MULT => result*= self.term()?,
                 MulOp::DIV => result /= self.term()?,
@@ -135,11 +145,11 @@ impl Interpreter {
     }
 
     pub fn expr(&mut self) -> Result<u32, String> {
-        self.get_next_token();
+        self.lexer.get_next_token();
         let mut result = self.term()?;
 
-        while let Token::ADDOP(i) = self.current_token.clone(){
-            self.get_next_token();
+        while let Token::ADDOP(i) = self.lexer.current_token.clone(){
+            self.lexer.get_next_token();
             match i{
                 AddOp::PLUS => result+= self.term()?,
                 AddOp::MINUS => result -= self.term()?
@@ -148,5 +158,41 @@ impl Interpreter {
 
         Ok(result)
     }
+
+}
+
+
+
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn basic_add(){
+        assert_eq!(3, Interpreter::new("1+2").unwrap().expr().unwrap());
+    }
+
+    #[test]
+    fn chain_add(){
+        assert_eq!(6, Interpreter::new("1+2+3").unwrap().expr().unwrap());
+    }
+
+    #[test]
+    fn precedence_test(){
+        assert_eq!(7, Interpreter::new("1+2*3").unwrap().expr().unwrap());
+    }
+
+    #[test]
+    fn precedence_test2(){
+        assert_eq!(5, Interpreter::new("1*2+3").unwrap().expr().unwrap());
+    }
+    
+    #[test]
+    fn parentheses_test(){
+        assert_eq!(9, Interpreter::new("(1+2)*3").unwrap().expr().unwrap());
+    }
+
 
 }
