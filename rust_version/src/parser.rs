@@ -85,22 +85,40 @@ impl Lexer{
     }
 }
 
-pub struct Interpreter {
+struct ASTreeNode{
+    left : Option<Token>,
+    right : Option<Token>,
+    value :  Token  
+}
+
+impl ASTreeNode{
+    fn new_with_values(value: Token,left: Option<Token>,right: Option<Token> ) -> ASTreeNode{ // Might change to options for left and right
+        ASTreeNode{
+            value,
+            right,
+            left
+        }
+    }
+
+    fn new(value : Token) ->ASTreeNode{
+        ASTreeNode{
+            value,
+            right : None,
+            left : None,
+        }
+    }
+}
+
+pub struct Parser {
     lexer: Lexer,
 }
 
 
-struct _ASTreeNode{
-    left : Token,
-    right : Token,
-    value : Token   
-}
+impl Parser {
 
-impl Interpreter {
-
-    pub fn new(input: &str)->Result<Interpreter,String>{
-        Ok(Interpreter{
-            lexer: Lexer::new(input)?
+    pub fn new(input: &str)->Result<Parser,String>{
+        Ok(Parser{
+            lexer: Lexer::new(input)?,
         })
     }
     
@@ -146,6 +164,7 @@ impl Interpreter {
 
     pub fn expr(&mut self) -> Result<u32, String> {
         self.lexer.get_next_token();
+        // let mut root = ASTreeNode::new(s: Token);
         let mut result = self.term()?;
 
         while let Token::ADDOP(i) = self.lexer.current_token.clone(){
@@ -171,27 +190,27 @@ mod tests {
 
     #[test]
     fn basic_add(){
-        assert_eq!(3, Interpreter::new("1+2").unwrap().expr().unwrap());
+        assert_eq!(3, Parser::new("1+2").unwrap().expr().unwrap());
     }
 
     #[test]
     fn chain_add(){
-        assert_eq!(6, Interpreter::new("1+2+3").unwrap().expr().unwrap());
+        assert_eq!(6, Parser::new("1+2+3").unwrap().expr().unwrap());
     }
 
     #[test]
     fn precedence_test(){
-        assert_eq!(7, Interpreter::new("1+2*3").unwrap().expr().unwrap());
+        assert_eq!(7, Parser::new("1+2*3").unwrap().expr().unwrap());
     }
 
     #[test]
     fn precedence_test2(){
-        assert_eq!(5, Interpreter::new("1*2+3").unwrap().expr().unwrap());
+        assert_eq!(5, Parser::new("1*2+3").unwrap().expr().unwrap());
     }
     
     #[test]
     fn parentheses_test(){
-        assert_eq!(9, Interpreter::new("(1+2)*3").unwrap().expr().unwrap());
+        assert_eq!(9, Parser::new("(1+2)*3").unwrap().expr().unwrap());
     }
 
 

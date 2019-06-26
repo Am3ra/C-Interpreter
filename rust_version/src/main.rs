@@ -7,7 +7,7 @@ fn main()-> Result<(), Box<std::error::Error>> {
         io::stdout().flush().unwrap();
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
-        let mut prs =  parser::Interpreter::new(&input)?;
+        let mut prs =  parser::Parser::new(&input)?;
         println!("{}", prs.expr()?);
     }
     
