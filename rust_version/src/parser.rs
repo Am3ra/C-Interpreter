@@ -85,18 +85,19 @@ impl Lexer{
     }
 }
 
+#[derive(Debug)]
 struct ASTreeNode{
-    left : Option<Token>,
-    right : Option<Token>,
-    value :  Token  
+    value :  Token,
+    left : Option<Box<ASTreeNode>>,
+    right : Option<Box<ASTreeNode>>,
 }
 
 impl ASTreeNode{
-    fn new_with_values(value: Token,left: Option<Token>,right: Option<Token> ) -> ASTreeNode{ // Might change to options for left and right
+    fn new_with_values(value: Token,left: Option<Box<ASTreeNode>>,right: Option<Box<ASTreeNode>> ) -> ASTreeNode{ // Might change to options for left and right
         ASTreeNode{
             value,
-            right,
-            left
+            left,
+            right
         }
     }
 
@@ -180,6 +181,43 @@ impl Parser {
 
 }
 
+struct Interpreter{
+    parser : Parser,
+}
+
+impl Interpreter{
+    pub fn new(input: &str)->Result<Interpreter,String>{
+        Ok(Interpreter{
+            parser: Parser::new(input)?,
+        })
+    }
+
+    fn interpret_input(input: ASTreeNode)->Result<u32,String>{
+         
+        match input.value{
+            Token::DIGIT(n)=> Ok(n),
+            Token::ADDOP(n)=>{
+                match n{
+                    AddOp::MINUS => Ok(Interpreter::interpret_input(*input.left.unwrap())? - Interpreter::interpret_input(*input.right.unwrap())?),
+                    AddOp::PLUS => Ok(Interpreter::interpret_input(*input.left.unwrap())? + Interpreter::interpret_input(*input.right.unwrap())?),
+                }
+            }
+            Token::MULOP(n)=>{
+                match n{
+                    MulOp::MULT => Ok(Interpreter::interpret_input(*input.left.unwrap())? * Interpreter::interpret_input(*input.right.unwrap())?),
+                    MulOp::DIV => Ok(Interpreter::interpret_input(*input.left.unwrap())? / Interpreter::interpret_input(*input.right.unwrap())?),
+                    MulOp::MODU => Ok(Interpreter::interpret_input(*input.left.unwrap())? % Interpreter::interpret_input(*input.right.unwrap())?),
+                }
+            },
+            _ => Err("Unknown Token".into())
+        }
+
+        
+    }
+
+    
+}
+
 
 
 
@@ -212,6 +250,35 @@ mod tests {
     fn parentheses_test(){
         assert_eq!(9, Parser::new("(1+2)*3").unwrap().expr().unwrap());
     }
+    
+    #[test]
+    fn basic_interp_plus(){
+        let root = ASTreeNode::new_with_values(Token::ADDOP(AddOp::PLUS), Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))), Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))));
+        assert_eq!(3, Interpreter::interpret_input(root).unwrap());
+    }
 
+    #[test]
+    fn basic_interp_minus(){
+        let root = ASTreeNode::new_with_values(Token::ADDOP(AddOp::MINUS), Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))), Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))));
+        assert_eq!(1, Interpreter::interpret_input(root).unwrap());
+    }
+
+    #[test]
+    fn basic_interp_times(){
+        let root = ASTreeNode::new_with_values(Token::MULOP(MulOp::MULT), Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))), Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))));
+        assert_eq!(6, Interpreter::interpret_input(root).unwrap());
+    }
+
+    #[test]
+    fn basic_interp_divide(){
+        let root = ASTreeNode::new_with_values(Token::MULOP(MulOp::DIV), Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))), Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))));
+        assert_eq!(0, Interpreter::interpret_input(root).unwrap());
+    }
+
+    #[test]
+    fn basic_interp_modulo(){
+        let root = ASTreeNode::new_with_values(Token::MULOP(MulOp::MODU), Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))), Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))));
+        assert_eq!(2, Interpreter::interpret_input(root).unwrap());
+    }
 
 }

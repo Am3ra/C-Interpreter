@@ -9,6 +9,8 @@ fn main()-> Result<(), Box<std::error::Error>> {
         io::stdin().read_line(&mut input).unwrap();
         let mut prs =  parser::Parser::new(&input)?;
         println!("{}", prs.expr()?);
+
+        
     }
     
 }
