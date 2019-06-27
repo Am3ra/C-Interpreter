@@ -1,5 +1,5 @@
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 enum Token {
     DIGIT(u32),
     ADDOP(AddOp),
@@ -9,13 +9,13 @@ enum Token {
     EOF,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 enum AddOp{
     PLUS,
     MINUS,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 enum MulOp{
     MULT,
     DIV,
@@ -85,7 +85,7 @@ impl Lexer{
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq,Clone)]
 struct ASTreeNode{
     value :  Token,
     left : Option<Box<ASTreeNode>>,
@@ -110,10 +110,9 @@ impl ASTreeNode{
     }
 }
 
-pub struct Parser {
+struct Parser {
     lexer: Lexer,
 }
-
 
 impl Parser {
 
@@ -124,11 +123,11 @@ impl Parser {
     }
     
 
-    fn atom(&mut self)-> Result<u32, String>{
+    fn atom(&mut self)-> Result<ASTreeNode, String>{
         match self.lexer.current_token{
             Token::DIGIT(i)=>{
                 self.lexer.get_next_token();
-                Ok(i)
+                Ok(ASTreeNode::new(Token::DIGIT(i)))
                 },
             Token::LPAREN=> {
                 let result = self.expr();
@@ -150,38 +149,65 @@ impl Parser {
         }
     }
 
-    fn term(&mut self)-> Result<u32,String>{
-        let mut result = self.atom()?;
-        while let Token::MULOP(i) = self.lexer.current_token.clone(){
-            self.lexer.get_next_token();
+    fn term(&mut self)-> Result<ASTreeNode,String>{
+        let left = self.atom()?;
+
+        if let Token::MULOP(i) = self.lexer.current_token.clone(){
             match i{
-                MulOp::MULT => result*= self.term()?,
-                MulOp::DIV => result /= self.term()?,
-                MulOp::MODU => result %= self.term()?
+                MulOp::MULT=> return Ok(ASTreeNode::new_with_values(
+                        Token::MULOP(MulOp::MULT), 
+                        Some(Box::new(left)), 
+                        Some(Box::new(self.expr()?)
+                        )
+                    )),
+                MulOp::DIV=> return Ok(ASTreeNode::new_with_values(
+                        Token::MULOP(MulOp::DIV), 
+                        Some(Box::new(left)), 
+                        Some(Box::new(self.expr()?)
+                        )
+                    )),
+                MulOp::MODU=> return Ok(ASTreeNode::new_with_values(
+                        Token::MULOP(MulOp::MODU), 
+                        Some(Box::new(left)), 
+                        Some(Box::new(self.expr()?)
+                        )
+                    )),
             }
         }
-        Ok(result)
+
+        Ok(left)
     }
 
-    pub fn expr(&mut self) -> Result<u32, String> {
+    pub fn expr(&mut self) -> Result<ASTreeNode, String> {
         self.lexer.get_next_token();
-        // let mut root = ASTreeNode::new(s: Token);
-        let mut result = self.term()?;
 
-        while let Token::ADDOP(i) = self.lexer.current_token.clone(){
-            self.lexer.get_next_token();
+        let left = self.term()?;
+
+        if let Token::ADDOP(i) = self.lexer.current_token.clone(){
+            // self.lexer.get_next_token();
+            println!("Current token {:?}", self.lexer.current_token);
             match i{
-                AddOp::PLUS => result+= self.term()?,
-                AddOp::MINUS => result -= self.term()?
+                AddOp::PLUS=> return Ok(ASTreeNode::new_with_values(
+                        Token::ADDOP(AddOp::PLUS), 
+                        Some(Box::new(left)), 
+                        Some(Box::new(self.expr()?)
+                        )
+                    )),
+                AddOp::MINUS=> return Ok(ASTreeNode::new_with_values(
+                        Token::ADDOP(AddOp::MINUS), 
+                        Some(Box::new(left)), 
+                        Some(Box::new(self.expr()?)
+                        )
+                    )),
             }
         }
 
-        Ok(result)
+        Ok(left)
     }
 
 }
 
-struct Interpreter{
+pub struct Interpreter{
     parser : Parser,
 }
 
@@ -215,11 +241,98 @@ impl Interpreter{
         
     }
 
-    
+    pub fn interpret(&mut self)->Result<u32,String>{
+        Interpreter::interpret_input(self.parser.expr()?)
+    }
 }
 
+pub struct Translator{
+    parser:Parser
+}
 
+impl Translator{
+    pub fn new(input : &str)->Result<Translator,String>{
+        Ok(Translator{
+            parser: Parser::new(input)?
+        })
+    }
 
+    fn rpn_interp(input : ASTreeNode)->Result<String,String>{
+        let mut result = String::new();
+        match input.value{
+            Token::DIGIT(n)=> result.push_str(&n.to_string()),
+            Token::ADDOP(n)=> {
+                match n{
+                    AddOp::PLUS => {
+                        result.push_str(&Translator::rpn_interp(*(input.left.unwrap()))?);
+                        result.push(' ');
+                        result.push_str(&Translator::rpn_interp(*input.right.unwrap())?);
+                        result.push(' ');
+                        result.push('+');
+                        },
+                    AddOp::MINUS => {
+                        result.push_str(&Translator::rpn_interp(*(input.left.unwrap()))?);
+                        result.push(' ');
+                        result.push_str(&Translator::rpn_interp(*input.right.unwrap())?);
+                        result.push(' ');
+                        result.push('-');
+                        },
+                }
+            },
+            Token::MULOP(n)=> {
+                match n{
+                    MulOp::MULT=>{
+                        result.push_str(&Translator::rpn_interp(*(input.left.unwrap()))?);
+                        result.push(' ');
+                        result.push_str(&Translator::rpn_interp(*input.right.unwrap())?);
+                        result.push(' ');
+                        result.push('*');
+                    },
+                    
+                    MulOp::DIV=>{
+                        result.push_str(&Translator::rpn_interp(*(input.left.unwrap()))?);
+                        result.push(' ');
+                        result.push_str(&Translator::rpn_interp(*input.right.unwrap())?);
+                        result.push(' ');
+                        result.push('/');
+                    },
+                    MulOp::MODU=>{
+                        result.push_str(&Translator::rpn_interp(*(input.left.unwrap()))?);
+                        result.push(' ');
+                        result.push_str(&Translator::rpn_interp(*input.right.unwrap())?);
+                        result.push(' ');
+                        result.push('%');
+                    },
+                }
+            }
+            _ => return Err(format!("ERROR unexpected Token: {:?}", input.value)),
+        }
+        Ok(result)
+    }
+
+    fn lisp_interp(input : ASTreeNode)->Result<String,String>{
+        let mut result = String::new();
+        match input.value{
+            Token::DIGIT(n)=> result.push_str(&n.to_string()),
+            Token::ADDOP(n)=> {
+                
+            },
+            Token::MULOP(n)=> {
+                
+            }
+            _ => return Err(format!("ERROR unexpected Token: {:?}", input.value)),
+        }
+        Ok(result)
+    }
+
+    pub fn to_rpn(&mut self)->Result<String,String>{
+        Translator::rpn_interp(self.parser.expr()?)
+    }
+
+    pub fn to_lisp(&mut self)->Result<String,String>{
+        Translator::lisp_interp(self.parser.expr()?)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -228,27 +341,27 @@ mod tests {
 
     #[test]
     fn basic_add(){
-        assert_eq!(3, Parser::new("1+2").unwrap().expr().unwrap());
+        assert_eq!(3, Interpreter::new("1+2").unwrap().interpret().unwrap());
     }
 
     #[test]
     fn chain_add(){
-        assert_eq!(6, Parser::new("1+2+3").unwrap().expr().unwrap());
+        assert_eq!(6, Interpreter::new("1+2+3").unwrap().interpret().unwrap());
     }
 
     #[test]
     fn precedence_test(){
-        assert_eq!(7, Parser::new("1+2*3").unwrap().expr().unwrap());
+        assert_eq!(7, Interpreter::new("1+2*3").unwrap().interpret().unwrap());
     }
 
     #[test]
     fn precedence_test2(){
-        assert_eq!(5, Parser::new("1*2+3").unwrap().expr().unwrap());
+        assert_eq!(5, Interpreter::new("1*2+3").unwrap().interpret().unwrap());
     }
     
     #[test]
     fn parentheses_test(){
-        assert_eq!(9, Parser::new("(1+2)*3").unwrap().expr().unwrap());
+        assert_eq!(9, Interpreter::new("(1+2)*3").unwrap().interpret().unwrap());
     }
     
     #[test]
@@ -281,4 +394,67 @@ mod tests {
         assert_eq!(2, Interpreter::interpret_input(root).unwrap());
     }
 
+    #[test]
+    fn parser_test() {
+        assert_eq!(
+            ASTreeNode::new_with_values(
+                Token::ADDOP(AddOp::PLUS), 
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))), 
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))))
+                , 
+            Parser::new("1+2").unwrap().expr().unwrap())
+    }
+
+    #[test]
+    fn lexer_test() {
+        let mut tok = Lexer::new("1+2").unwrap();
+        tok.get_next_token();
+        assert_eq!(Token::DIGIT(1), tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::ADDOP(AddOp::PLUS), tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::DIGIT(2), tok.current_token);
+    }
+
+    #[test]
+    fn atom_test() {
+        let mut pars =  Parser::new("1+2").unwrap();
+        pars.lexer.get_next_token();
+
+        assert_eq!(Ok(ASTreeNode::new(Token::DIGIT(1))), pars.atom())
+    }
+
+    #[test]
+    fn atom_test2() {
+        let mut pars =  Parser::new("1+2").unwrap();
+        pars.lexer.get_next_token();
+        pars.lexer.get_next_token();
+
+        assert_eq!(Err("Expected digit".into()), pars.atom())
+    }
+
+    #[test]
+    fn atom_test3() {
+        let mut pars =  Parser::new("1+2").unwrap();
+        pars.lexer.get_next_token();
+        pars.lexer.get_next_token();
+        pars.lexer.get_next_token();
+
+        assert_eq!(Ok(ASTreeNode::new(Token::DIGIT(2))), pars.atom())
+    }
+
+    #[test]
+    fn parser_basic() {
+        assert_eq!(
+            ASTreeNode::new(
+                Token::DIGIT(1)
+            ),
+            Parser::new("1").unwrap().expr().unwrap()
+        )
+    }
+
+    #[test]
+    fn rpn_translate() {
+        assert_eq!("1 2 +", Translator::new("1+2").unwrap().to_rpn().unwrap())
+    }
 }
