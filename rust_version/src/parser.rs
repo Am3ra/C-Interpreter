@@ -1,9 +1,10 @@
 
 #[derive(Clone,Debug,PartialEq)]
 enum Token {
-    DIGIT(u32),
+    DIGIT(i32),
     ADDOP(AddOp),
     MULOP(MulOp),
+    UNOP(UnaryOp),
     LPAREN,
     RPAREN,
     EOF,
@@ -11,6 +12,12 @@ enum Token {
 
 #[derive(Clone,Debug,PartialEq)]
 enum AddOp{
+    PLUS,
+    MINUS,
+}
+
+#[derive(Clone,Debug,PartialEq)]
+enum UnaryOp{
     PLUS,
     MINUS,
 }
@@ -142,9 +149,21 @@ impl Parser {
                     }
                 }
             },
+            Token::ADDOP(AddOp::MINUS)=> {
+                    self.lexer.get_next_token();
+                    let mut current = ASTreeNode::new(Token::UNOP(UnaryOp::MINUS));
+                    current.left = Some(Box::new(self.atom()?));
+                    Ok(current)
+            },
+            Token::ADDOP(AddOp::PLUS)=>{
+                self.lexer.get_next_token();
+                let mut current = ASTreeNode::new(Token::UNOP(UnaryOp::PLUS));
+                current.left = Some(Box::new(self.atom()?));
+                Ok(current)
+            },
             _=>{
                 println!("Current TOK ERR, {:?}", self.lexer.current_token);
-                Err("Expected digit".into())
+                Err("Expected digit, '+' , '-' , or '(' ".into())
                 }
         }
     }
@@ -185,7 +204,7 @@ impl Parser {
 
         if let Token::ADDOP(i) = self.lexer.current_token.clone(){
             // self.lexer.get_next_token();
-            println!("Current token {:?}", self.lexer.current_token);
+            // println!("Current token {:?}", self.lexer.current_token);
             match i{
                 AddOp::PLUS=> return Ok(ASTreeNode::new_with_values(
                         Token::ADDOP(AddOp::PLUS), 
@@ -218,7 +237,7 @@ impl Interpreter{
         })
     }
 
-    fn interpret_input(input: ASTreeNode)->Result<u32,String>{
+    fn interpret_input(input: ASTreeNode)->Result<i32,String>{
          
         match input.value{
             Token::DIGIT(n)=> Ok(n),
@@ -235,21 +254,29 @@ impl Interpreter{
                     MulOp::MODU => Ok(Interpreter::interpret_input(*input.left.unwrap())? % Interpreter::interpret_input(*input.right.unwrap())?),
                 }
             },
+            Token::UNOP(n)=>{
+                match n {
+                    UnaryOp::PLUS => Ok(Interpreter::interpret_input(*input.left.unwrap())?),
+                    UnaryOp::MINUS => Ok(-Interpreter::interpret_input(*input.left.unwrap())?)
+                }
+            },
             _ => Err("Unknown Token".into())
         }
 
         
     }
 
-    pub fn interpret(&mut self)->Result<u32,String>{
+    pub fn interpret(&mut self)->Result<i32,String>{
         Interpreter::interpret_input(self.parser.expr()?)
     }
 }
 
+#[allow(dead_code)]
 pub struct Translator{
     parser:Parser
-}
+} 
 
+#[allow(dead_code)]
 impl Translator{
     pub fn new(input : &str)->Result<Translator,String>{
         Ok(Translator{
@@ -310,28 +337,11 @@ impl Translator{
         Ok(result)
     }
 
-    fn lisp_interp(input : ASTreeNode)->Result<String,String>{
-        let mut result = String::new();
-        match input.value{
-            Token::DIGIT(n)=> result.push_str(&n.to_string()),
-            Token::ADDOP(n)=> {
-                
-            },
-            Token::MULOP(n)=> {
-                
-            }
-            _ => return Err(format!("ERROR unexpected Token: {:?}", input.value)),
-        }
-        Ok(result)
-    }
 
     pub fn to_rpn(&mut self)->Result<String,String>{
         Translator::rpn_interp(self.parser.expr()?)
     }
 
-    pub fn to_lisp(&mut self)->Result<String,String>{
-        Translator::lisp_interp(self.parser.expr()?)
-    }
 }
 
 #[cfg(test)]
@@ -342,6 +352,21 @@ mod tests {
     #[test]
     fn basic_add(){
         assert_eq!(3, Interpreter::new("1+2").unwrap().interpret().unwrap());
+    }
+
+    #[test]
+    fn unary_minus(){
+        assert_eq!(3, Interpreter::new("--3").unwrap().interpret().unwrap());
+    }
+
+    #[test]
+    fn unary_plus(){
+        assert_eq!(3, Interpreter::new("++3").unwrap().interpret().unwrap());
+    }
+
+    #[test]
+    fn unary_both() {
+        assert_eq!(3, Interpreter::new("++3").unwrap().interpret().unwrap());
     }
 
     #[test]
@@ -424,14 +449,6 @@ mod tests {
         assert_eq!(Ok(ASTreeNode::new(Token::DIGIT(1))), pars.atom())
     }
 
-    #[test]
-    fn atom_test2() {
-        let mut pars =  Parser::new("1+2").unwrap();
-        pars.lexer.get_next_token();
-        pars.lexer.get_next_token();
-
-        assert_eq!(Err("Expected digit".into()), pars.atom())
-    }
 
     #[test]
     fn atom_test3() {
