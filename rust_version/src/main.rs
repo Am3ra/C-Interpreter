@@ -8,7 +8,7 @@ fn main()-> Result<(), Box<std::error::Error>> {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
         
-        println!("{}", parser::Interpreter::new(&input)?.interpret()?);
+        println!("{}", parser::Interpreter::new(&input)?.interpret_expr()?);
 
         
     }

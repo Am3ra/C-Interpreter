@@ -1,3 +1,49 @@
+// use std::collections::HashSet;
+use std::collections::HashMap;
+use std::iter::FromIterator;
+
+// static reserved_keys_array = ["into"];
+
+
+/**
+ * 
+ * NOTE: IF IN CAPITALS, CONSUME AND ADVANCE
+ * 
+ * Current Grammar:
+ * 
+ * block := LBRACE statement_list RBRACE,
+ * statement_list := 1*(statement)
+ * statement := (expr SEMI | declaration | block) 
+ * expr := addop *(ASSIGN expr)
+ * addop := term *((PLUS/MINUS) expr)
+ * mulop := atom ((MUL/DIV) expr)
+ * atom := (PLUS/MINUS) atom | 
+ *          INTEGER | 
+ *          LPAREN expr RPAREN 
+ * declaration := type IDENTIFIER [ASSIGN expr] SEMI
+ * assignment := identifier ASSIGN expr 
+ * type := INT
+ * identifier := alphabetic *(alphanumeric) //don't know how to write this
+ * LBRACE = '{'
+ * RBRACE = '}'
+ * LPAREN = '('
+ * RPAREN = ')'
+ * ASSIGN = '='
+ * 
+ * 
+ * 
+ * ORDER OF OPERATIONS:
+ * 
+ * 1: UNARY PLUS/MINUS, NOT (RIGHT TO LEFT ASS.)
+ * 2: MULT / DIV (LEFT TO RIGHT ASS.)
+ * 3: ADD/SUB (LEFT TO RIGHT ASS.)
+ * 4: ASSIGNMENT, =, +=, -=, *=. /=, %=, (RIGHT TO LEFT ASS.) 
+ */
+
+#[derive(Clone,Debug,PartialEq)]
+enum Type{
+    INT
+}
 
 #[derive(Clone,Debug,PartialEq)]
 enum Token {
@@ -7,7 +53,21 @@ enum Token {
     UNOP(UnaryOp),
     LPAREN,
     RPAREN,
+    LBRACE,
+    RBRACE,
+    SEMI,
+    LT,
+    GT,
+    EQ,
+    // NE,
+    LE,
+    GE,
+    ASSIGN,
     EOF,
+    Type(Type),
+    IDENT(String),
+    StatementList(Vec<ASTreeNode>),
+    DECLARE,
 }
 
 #[derive(Clone,Debug,PartialEq)]
@@ -33,7 +93,8 @@ struct Lexer{
     input: Vec<char>,
     position: usize,
     current_token: Token,
-    len : usize
+    len : usize,
+    hash : HashMap<String,Token>
 }
 
 impl Lexer{
@@ -46,6 +107,29 @@ impl Lexer{
         }
 
         return Token::DIGIT(number_so_far.parse().unwrap());
+    }
+
+    fn identifier(&mut self)->Token{
+        let mut string_so_far = String::new();
+        while self.position < self.len  && self.input[self.position].is_alphanumeric(){
+            string_so_far.push( self.input[self.position]);
+            self.position+=1;
+        }
+        if let Some(i) = self.hash.get(&string_so_far){
+            // MUCH cleaner than a match.
+            return i.clone()
+        }
+        
+        Token::IDENT(string_so_far)
+    }
+
+    fn peek(&self)-> Option<char>{
+        let peek_pos =  self.position + 1;
+        if peek_pos >= self.len {
+            return None;
+        }else{
+            return Some(self.input[peek_pos])
+        }
     }
 
     pub fn get_next_token(&mut self) {
@@ -62,6 +146,10 @@ impl Lexer{
         if current_char.is_digit(10) {
             return self.current_token= self.digit();
         } 
+
+        if current_char.is_alphabetic(){
+            return self.current_token = self.identifier();
+        }
         
         self.position += 1;
 
@@ -73,6 +161,42 @@ impl Lexer{
             '%' => self.current_token = Token::MULOP(MulOp::MODU),
             '(' => self.current_token = Token::LPAREN,
             ')' => self.current_token = Token::RPAREN,
+            '{' => self.current_token = Token::LBRACE,
+            '}' => self.current_token = Token::RBRACE,
+            ';' => self.current_token = Token::SEMI,
+            '=' => {
+                if let Some(n) = self.peek(){
+                    match n {
+                        '=' => {
+                            self.current_token = Token::EQ;
+                            self.position +=1;
+                            },
+                        _ => self.current_token = Token::ASSIGN,
+                    }
+                }
+            }
+            '<' => {
+                if let Some(n) = self.peek(){
+                    match n {
+                        '=' => {
+                            self.current_token = Token::LE;
+                            self.position +=1;
+                            },
+                        _ => self.current_token = Token::LT,
+                    }
+                }
+            }
+            '>' => {
+                if let Some(n) = self.peek(){
+                    match n {
+                        '=' => {
+                            self.current_token = Token::GE;
+                            self.position +=1;
+                            },
+                        _ => self.current_token = Token::GT,
+                    }
+                }
+            }
             _   =>  panic!("UNRECOGNIZED TOKEN: {}", current_char)
         }
 
@@ -83,12 +207,17 @@ impl Lexer{
             return Err("Must have lenght".into())
         }
         let input :Vec<char> = input.trim().chars().collect();
-        Ok(Lexer {
+        // let reserved_keys : HashSet<String> = vec!["int".into()].iter().cloned().collect();
+        let hash : HashMap<String,Token> = HashMap::from_iter(vec![("int".into(),Token::Type(Type::INT)), ("test".into(),Token::EOF)]);
+        let mut lex = Lexer {
             len: input.len(),
             input,
             position: 0,
             current_token: Token::EOF,
-        })
+            hash
+        };
+        lex.get_next_token();
+        Ok(lex)
     }
 }
 
@@ -117,6 +246,15 @@ impl ASTreeNode{
     }
 }
 
+impl From<ASTreeNode> for Vec<ASTreeNode> {
+    fn from(item: ASTreeNode) -> Self {
+        let mut vec : Vec<ASTreeNode> = Vec::new();
+        vec.push(item);
+        vec
+    }
+}
+
+
 struct Parser {
     lexer: Lexer,
 }
@@ -137,6 +275,7 @@ impl Parser {
                 Ok(ASTreeNode::new(Token::DIGIT(i)))
                 },
             Token::LPAREN=> {
+                self.lexer.get_next_token();                
                 let result = self.expr();
                 match self.lexer.current_token{
                     Token::RPAREN=> {
@@ -161,6 +300,7 @@ impl Parser {
                 current.left = Some(Box::new(self.atom()?));
                 Ok(current)
             },
+
             _=>{
                 println!("Current TOK ERR, {:?}", self.lexer.current_token);
                 Err("Expected digit, '+' , '-' , or '(' ".into())
@@ -172,6 +312,7 @@ impl Parser {
         let left = self.atom()?;
 
         if let Token::MULOP(i) = self.lexer.current_token.clone(){
+            self.lexer.get_next_token();
             match i{
                 MulOp::MULT=> return Ok(ASTreeNode::new_with_values(
                         Token::MULOP(MulOp::MULT), 
@@ -197,14 +338,12 @@ impl Parser {
         Ok(left)
     }
 
-    pub fn expr(&mut self) -> Result<ASTreeNode, String> {
-        self.lexer.get_next_token();
+    fn addop(&mut self) -> Result<ASTreeNode, String> {
 
         let left = self.term()?;
 
         if let Token::ADDOP(i) = self.lexer.current_token.clone(){
-            // self.lexer.get_next_token();
-            // println!("Current token {:?}", self.lexer.current_token);
+            self.lexer.get_next_token();
             match i{
                 AddOp::PLUS=> return Ok(ASTreeNode::new_with_values(
                         Token::ADDOP(AddOp::PLUS), 
@@ -221,7 +360,98 @@ impl Parser {
             }
         }
 
+
         Ok(left)
+    }
+
+    pub fn expr(&mut self) -> Result<ASTreeNode, String> {
+        let left = self.addop()?;
+        if Token::ASSIGN == self.lexer.current_token{
+            self.lexer.get_next_token();
+            return Ok(ASTreeNode::new_with_values(
+                        Token::ASSIGN, 
+                        Some(Box::new(left)), 
+                        Some(Box::new(self.expr()?))))
+        }
+        Ok(left)
+    }
+
+    fn declaration(&mut self)->Result<ASTreeNode,String>{
+        let mut result = ASTreeNode::new(Token::DECLARE);
+        if let Token::Type(i) = self.lexer.current_token.clone(){
+            result.left = Some(Box::new(ASTreeNode::new(Token::Type(i))));
+            self.lexer.get_next_token();
+            match self.lexer.current_token{
+                Token::SEMI   => {
+                    self.lexer.get_next_token();
+                    Ok(result)
+                },
+                Token::ASSIGN => {
+                    self.lexer.get_next_token();
+                    result.right = Some(
+                                    Box::new(
+                                    ASTreeNode::new_with_values(Token::ASSIGN, Some(Box::new(self.expr()?)), None)));
+                    Ok(result)
+                },
+                _ => Err("Expected '=' or ';'".into())
+            }
+            
+        }
+        else{
+            Err("Expected type".into())
+        }
+        
+    }
+
+    fn statement(&mut self)-> Result<ASTreeNode,String>{
+
+        match self.lexer.current_token.clone(){
+            Token::Type(i)=> self.declaration(),
+            Token::LBRACE => self.interp_block(),
+            _             => {
+                let result = self.expr();
+                if self.lexer.current_token == Token::SEMI{
+                    self.lexer.get_next_token();
+                    result
+                }else{
+                    Err("Expected SEMI".into())
+                }
+            }
+        }
+        
+    }
+
+    fn statement_list(&mut self)->Result<ASTreeNode,String>{
+        let mut statements_vec:Vec<ASTreeNode> = Vec::from(self.statement()?);
+        
+        while self.lexer.current_token == Token::SEMI{
+            statements_vec.push(self.statement()?)
+        }
+        Ok(ASTreeNode::new(Token::StatementList(statements_vec)))
+    }
+
+    fn interp_block(&mut self)->Result<ASTreeNode,String>{
+        let mut result = ASTreeNode::new(Token::StatementList(Vec::new()));
+        if self.lexer.current_token == Token::LBRACE{
+            self.lexer.get_next_token();
+            
+            if self.lexer.current_token == Token::RBRACE{
+                self.lexer.get_next_token();
+                return Ok(result)
+            }
+            else {
+                return Err("Expected '}".into())
+            }
+        }
+        else {
+            return Err("Expected '{".into())
+        }
+    }
+
+
+    pub fn start_block(&mut self)->Result<ASTreeNode,String>{
+        // self.lexer.get_next_token();
+        self.interp_block()
     }
 
 }
@@ -231,6 +461,7 @@ pub struct Interpreter{
 }
 
 impl Interpreter{
+
     pub fn new(input: &str)->Result<Interpreter,String>{
         Ok(Interpreter{
             parser: Parser::new(input)?,
@@ -266,7 +497,7 @@ impl Interpreter{
         
     }
 
-    pub fn interpret(&mut self)->Result<i32,String>{
+    pub fn interpret_expr(&mut self)->Result<i32,String>{
         Interpreter::interpret_input(self.parser.expr()?)
     }
 }
@@ -351,42 +582,42 @@ mod tests {
 
     #[test]
     fn basic_add(){
-        assert_eq!(3, Interpreter::new("1+2").unwrap().interpret().unwrap());
+        assert_eq!(3, Interpreter::new("1+2").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn unary_minus(){
-        assert_eq!(3, Interpreter::new("--3").unwrap().interpret().unwrap());
+        assert_eq!(3, Interpreter::new("--3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn unary_plus(){
-        assert_eq!(3, Interpreter::new("++3").unwrap().interpret().unwrap());
+        assert_eq!(3, Interpreter::new("++3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn unary_both() {
-        assert_eq!(3, Interpreter::new("++3").unwrap().interpret().unwrap());
+        assert_eq!(3, Interpreter::new("++3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn chain_add(){
-        assert_eq!(6, Interpreter::new("1+2+3").unwrap().interpret().unwrap());
+        assert_eq!(6, Interpreter::new("1+2+3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn precedence_test(){
-        assert_eq!(7, Interpreter::new("1+2*3").unwrap().interpret().unwrap());
+        assert_eq!(7, Interpreter::new("1+2*3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn precedence_test2(){
-        assert_eq!(5, Interpreter::new("1*2+3").unwrap().interpret().unwrap());
+        assert_eq!(5, Interpreter::new("1*2+3").unwrap().interpret_expr().unwrap());
     }
     
     #[test]
     fn parentheses_test(){
-        assert_eq!(9, Interpreter::new("(1+2)*3").unwrap().interpret().unwrap());
+        assert_eq!(9, Interpreter::new("(1+2)*3").unwrap().interpret_expr().unwrap());
     }
     
     #[test]
@@ -419,6 +650,30 @@ mod tests {
         assert_eq!(2, Interpreter::interpret_input(root).unwrap());
     }
 
+     #[test]
+    fn interp_block() {
+        let root = Parser::new("{}");
+        assert_eq!(
+            ASTreeNode::new(Token::StatementList(Vec::new()))
+            ,
+            root.unwrap().interp_block().unwrap()
+            )
+    }
+
+    #[test]
+    fn parser_precedence() {
+        assert_eq!(
+            ASTreeNode::new_with_values(
+                Token::ADDOP(AddOp::PLUS), 
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))), 
+                Some(Box::new(ASTreeNode::new_with_values(
+                    Token::MULOP(MulOp::MULT), 
+                    Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))), 
+                    Some(Box::new(ASTreeNode::new(Token::DIGIT(3))))))))
+                , 
+            Parser::new("1+2*3").unwrap().expr().unwrap())
+    }
+
     #[test]
     fn parser_test() {
         assert_eq!(
@@ -429,23 +684,37 @@ mod tests {
                 , 
             Parser::new("1+2").unwrap().expr().unwrap())
     }
+    #[test]
+    fn parser_test_mult() {
+        assert_eq!(
+            ASTreeNode::new_with_values(
+                Token::MULOP(MulOp::MULT), 
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))), 
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))))
+                , 
+            Parser::new("1*2").unwrap().expr().unwrap())
+    }
 
     #[test]
     fn lexer_test() {
         let mut tok = Lexer::new("1+2").unwrap();
-        tok.get_next_token();
         assert_eq!(Token::DIGIT(1), tok.current_token);
         tok.get_next_token();
         assert_eq!(Token::ADDOP(AddOp::PLUS), tok.current_token);
         tok.get_next_token();
         assert_eq!(Token::DIGIT(2), tok.current_token);
     }
+    #[test]
+    fn lexer_test_ident_vs_key() {
+        let mut tok = Lexer::new("int a").unwrap();
+        assert_eq!(Token::Type(Type::INT), tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::IDENT("a".into()), tok.current_token);
+    }
 
     #[test]
     fn atom_test() {
         let mut pars =  Parser::new("1+2").unwrap();
-        pars.lexer.get_next_token();
-
         assert_eq!(Ok(ASTreeNode::new(Token::DIGIT(1))), pars.atom())
     }
 
@@ -453,7 +722,6 @@ mod tests {
     #[test]
     fn atom_test3() {
         let mut pars =  Parser::new("1+2").unwrap();
-        pars.lexer.get_next_token();
         pars.lexer.get_next_token();
         pars.lexer.get_next_token();
 
@@ -471,7 +739,18 @@ mod tests {
     }
 
     #[test]
+    fn parser_statement() {
+        assert_eq!(
+            Parser::new("1+2").unwrap().expr().unwrap(), 
+            Parser::new("1+2;").unwrap().statement().unwrap()
+            )
+    }
+
+    #[test]
     fn rpn_translate() {
         assert_eq!("1 2 +", Translator::new("1+2").unwrap().to_rpn().unwrap())
     }
+
+   
+
 }
