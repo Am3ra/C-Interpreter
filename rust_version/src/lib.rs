@@ -1,8 +1,6 @@
-// use std::collections::HashSet;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
-// static reserved_keys_array = ["into"];
 
 
 /**
@@ -446,10 +444,12 @@ impl Parser {
     }
 
     fn parse_block(&mut self)->Result<ASTreeNode,String>{
-        let result = ASTreeNode::new(Token::StatementList(Vec::new()));
+        
         if self.lexer.current_token == Token::LBRACE{
             self.lexer.get_next_token();
-            
+
+            let result = self.statement_list()?; 
+
             if self.lexer.current_token == Token::RBRACE{
                 self.lexer.get_next_token();
                 Ok(result)
@@ -464,10 +464,10 @@ impl Parser {
     }
 
 
-    pub fn start_block(&mut self)->Result<ASTreeNode,String>{
-        // self.lexer.get_next_token();
-        self.parse_block()
-    }
+    // pub fn start_block(&mut self)->Result<ASTreeNode,String>{
+    //     // self.lexer.get_next_token();
+    //     self.parse_block()
+    // }
 
 }
 
@@ -515,8 +515,10 @@ impl Interpreter{
                 }
                 result
             },
-            Token::Type(_t)=>{
-
+            Token::Type(t)=>{
+                if let Some(i) = input.left {
+                    
+                }
                 Err("unknown Err".into())
             },
             _ => Err("Unknown Token".into())
