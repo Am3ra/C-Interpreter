@@ -112,7 +112,7 @@ impl Lexer{
             self.position+=1;
         }
 
-        return Token::DIGIT(number_so_far.parse().unwrap());
+        Token::DIGIT(number_so_far.parse().unwrap())
     }
 
     fn identifier(&mut self)->Token{
@@ -131,9 +131,9 @@ impl Lexer{
 
     fn peek(&self)-> Option<char>{
         if self.position >= self.len {
-            return None;
+            None
         }else{
-            return Some(self.input[self.position])
+            Some(self.input[self.position])
         }
     }
 
@@ -208,7 +208,7 @@ impl Lexer{
     }
 
     pub fn new(input: &str) -> Result<Lexer,String> {
-        if input.len()<1 {
+        if input.is_empty() {
             return Err("Must have lenght".into())
         }
         let input :Vec<char> = input.trim().chars().collect();
@@ -452,14 +452,14 @@ impl Parser {
             
             if self.lexer.current_token == Token::RBRACE{
                 self.lexer.get_next_token();
-                return Ok(result)
+                Ok(result)
             }
             else {
-                return Err("Expected '}".into())
+                Err("Expected '}".into())
             }
         }
         else {
-            return Err("Expected '{".into())
+            Err("Expected '{".into())
         }
     }
 
@@ -602,7 +602,7 @@ impl Translator{
     }
 
 
-    pub fn to_rpn(&mut self)->Result<String,String>{
+    pub fn rpn_translate(&mut self)->Result<String,String>{
         Translator::rpn_interp(self.parser.expr()?)
     }
 
@@ -809,7 +809,7 @@ mod tests {
 
     #[test]
     fn rpn_translate() {
-        assert_eq!("1 2 +", Translator::new("1+2").unwrap().to_rpn().unwrap())
+        assert_eq!("1 2 +", Translator::new("1+2").unwrap().rpn_translate().unwrap())
     }
 
    #[test]
