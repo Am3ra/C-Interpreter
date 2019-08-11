@@ -11,26 +11,33 @@ use std::iter::FromIterator;
  * 
  * Current Grammar:
  * 
- * block := LBRACE statement_list RBRACE,
- * statement_list := 1*(statement)
- * statement := (expr SEMI | declaration | block) 
- * expr := addop *(ASSIGN expr)
- * addop := term *((PLUS/MINUS) expr)
- * mulop := atom ((MUL/DIV) expr)
- * atom := (PLUS/MINUS) atom | 
+ * program : MAIN block
+ * block : LBRACE statement_list RBRACE,
+ * statement_list : 1*(statement)
+ * statement : (expr SEMI | declaration | block) 
+ * expr : addop *(ASSIGN expr)
+ * addop : term *((PLUS/MINUS) expr)
+ * mulop : atom ((MUL/DIV) expr)
+ * atom : (PLUS/MINUS) atom | 
  *          INTEGER | 
  *          LPAREN expr RPAREN 
- * declaration := type IDENTIFIER [ASSIGN expr] SEMI
- * assignment := identifier ASSIGN expr 
- * type := INT
- * identifier := alphabetic *(alphanumeric) //don't know how to write this
+ * declaration : type IDENTIFIER [ASSIGN expr] SEMI
+ * assignment : identifier ASSIGN expr 
+ * type : INT,FLOAT //TODO: IMPLEMENT FLOAT
+ * identifier : alphabetic *(alphanumeric) //don't know how to write this
  * LBRACE = '{'
  * RBRACE = '}'
  * LPAREN = '('
  * RPAREN = ')'
  * ASSIGN = '='
+ * COMMA  = ','
+ * MAIN   = 'main'
  * 
+ * Proposed Grammar: 
  * 
+ * function : TYPE IDENTIFIER argument_list block
+ * argument_list : LPAREN argument  *(COMMA argument)  RPAREN
+ * argument : TYPE IDENT
  * 
  * ORDER OF OPERATIONS:
  * 
@@ -67,7 +74,6 @@ enum Token {
     Type(Type),
     IDENT(String),
     StatementList(Vec<ASTreeNode>),
-    DECLARE,
 }
 
 #[derive(Clone,Debug,PartialEq)]
@@ -94,7 +100,7 @@ struct Lexer{
     position: usize,
     current_token: Token,
     len : usize,
-    hash : HashMap<String,Token>
+    restricted_words : HashMap<String,Token>
 }
 
 impl Lexer{
@@ -115,7 +121,7 @@ impl Lexer{
             string_so_far.push( self.input[self.position]);
             self.position+=1;
         }
-        if let Some(i) = self.hash.get(&string_so_far){
+        if let Some(i) = self.restricted_words.get(&string_so_far){
             // MUCH cleaner than a match.
             return i.clone()
         }
@@ -124,11 +130,10 @@ impl Lexer{
     }
 
     fn peek(&self)-> Option<char>{
-        let peek_pos =  self.position + 1;
-        if peek_pos >= self.len {
+        if self.position >= self.len {
             return None;
         }else{
-            return Some(self.input[peek_pos])
+            return Some(self.input[self.position])
         }
     }
 
@@ -208,13 +213,13 @@ impl Lexer{
         }
         let input :Vec<char> = input.trim().chars().collect();
         // let reserved_keys : HashSet<String> = vec!["int".into()].iter().cloned().collect();
-        let hash : HashMap<String,Token> = HashMap::from_iter(vec![("int".into(),Token::Type(Type::INT)), ("test".into(),Token::EOF)]);
+        let restricted_words : HashMap<String,Token> = HashMap::from_iter(vec![("int".into(),Token::Type(Type::INT)), ("test".into(),Token::EOF)]);
         let mut lex = Lexer {
             len: input.len(),
             input,
             position: 0,
             current_token: Token::EOF,
-            hash
+            restricted_words
         };
         lex.get_next_token();
         Ok(lex)
@@ -377,25 +382,35 @@ impl Parser {
     }
 
     fn declaration(&mut self)->Result<ASTreeNode,String>{
-        let mut result = ASTreeNode::new(Token::DECLARE);
-        if let Token::Type(i) = self.lexer.current_token.clone(){
-            result.left = Some(Box::new(ASTreeNode::new(Token::Type(i))));
+        
+        if let Token::Type(_i) = self.lexer.current_token.clone(){
+            let mut result = ASTreeNode::new(self.lexer.current_token.clone());
             self.lexer.get_next_token();
-            match self.lexer.current_token{
+
+            if let Token::IDENT(_i) = self.lexer.current_token.clone(){
+                result.left = Some(Box::new(ASTreeNode::new(self.lexer.current_token.clone())));
+
+                self.lexer.get_next_token();
+
+                match self.lexer.current_token{
                 Token::SEMI   => {
                     self.lexer.get_next_token();
-                    Ok(result)
+                    return Ok(result)
                 },
                 Token::ASSIGN => {
                     self.lexer.get_next_token();
                     result.right = Some(
                                     Box::new(
-                                    ASTreeNode::new_with_values(Token::ASSIGN, Some(Box::new(self.expr()?)), None)));
-                    Ok(result)
+                                    self.expr()?));
+                    return Ok(result)
                 },
-                _ => Err("Expected '=' or ';'".into())
+                _ => return Err("Expected '=' or ';'".into())
             }
-            
+
+            }else{
+                return Err("Parsing Error: Expected identifier".into())
+            }
+
         }
         else{
             Err("Expected type".into())
@@ -406,8 +421,8 @@ impl Parser {
     fn statement(&mut self)-> Result<ASTreeNode,String>{
 
         match self.lexer.current_token.clone(){
-            Token::Type(i)=> self.declaration(),
-            Token::LBRACE => self.interp_block(),
+            Token::Type(_i)=> self.declaration(),
+            Token::LBRACE => self.parse_block(),
             _             => {
                 let result = self.expr();
                 if self.lexer.current_token == Token::SEMI{
@@ -430,8 +445,8 @@ impl Parser {
         Ok(ASTreeNode::new(Token::StatementList(statements_vec)))
     }
 
-    fn interp_block(&mut self)->Result<ASTreeNode,String>{
-        let mut result = ASTreeNode::new(Token::StatementList(Vec::new()));
+    fn parse_block(&mut self)->Result<ASTreeNode,String>{
+        let result = ASTreeNode::new(Token::StatementList(Vec::new()));
         if self.lexer.current_token == Token::LBRACE{
             self.lexer.get_next_token();
             
@@ -451,13 +466,14 @@ impl Parser {
 
     pub fn start_block(&mut self)->Result<ASTreeNode,String>{
         // self.lexer.get_next_token();
-        self.interp_block()
+        self.parse_block()
     }
 
 }
 
 pub struct Interpreter{
     parser : Parser,
+    global_vars: HashMap<String, Type>,
 }
 
 impl Interpreter{
@@ -465,6 +481,7 @@ impl Interpreter{
     pub fn new(input: &str)->Result<Interpreter,String>{
         Ok(Interpreter{
             parser: Parser::new(input)?,
+            global_vars : HashMap::new(),
         })
     }
 
@@ -491,6 +508,17 @@ impl Interpreter{
                     UnaryOp::MINUS => Ok(-Interpreter::interpret_input(*input.left.unwrap())?)
                 }
             },
+            Token::StatementList(list)=> {
+                let mut result = Err("Error parsing result".into());
+                for i in list{
+                    result = Ok(Interpreter::interpret_input(i)?);
+                }
+                result
+            },
+            Token::Type(_t)=>{
+
+                Err("unknown Err".into())
+            },
             _ => Err("Unknown Token".into())
         }
 
@@ -500,12 +528,17 @@ impl Interpreter{
     pub fn interpret_expr(&mut self)->Result<i32,String>{
         Interpreter::interpret_input(self.parser.expr()?)
     }
+
+    pub fn interpret_block(& mut self)->Result<i32,String>{
+        Interpreter::interpret_input(self.parser.parse_block()?)
+    }
 }
 
 #[allow(dead_code)]
 pub struct Translator{
     parser:Parser
 } 
+
 
 #[allow(dead_code)]
 impl Translator{
@@ -656,7 +689,7 @@ mod tests {
         assert_eq!(
             ASTreeNode::new(Token::StatementList(Vec::new()))
             ,
-            root.unwrap().interp_block().unwrap()
+            root.unwrap().parse_block().unwrap()
             )
     }
 
@@ -672,6 +705,25 @@ mod tests {
                     Some(Box::new(ASTreeNode::new(Token::DIGIT(3))))))))
                 , 
             Parser::new("1+2*3").unwrap().expr().unwrap())
+    }
+
+    #[test]
+    fn lexer_peek() {
+        let lex = Lexer::new("1+2").unwrap();
+        assert_eq!(lex.current_token, Token::DIGIT(1));
+        assert_eq!(lex.peek(), Some('+'))
+    }
+
+    #[test]
+    fn assignment() {
+        assert_eq!(
+            ASTreeNode::new_with_values(
+                Token::ASSIGN, 
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))), 
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(1))))), 
+            Parser::new("1=1").unwrap().expr().unwrap()
+
+        )
     }
 
     #[test]
@@ -701,6 +753,15 @@ mod tests {
         assert_eq!(Token::DIGIT(1), tok.current_token);
         tok.get_next_token();
         assert_eq!(Token::ADDOP(AddOp::PLUS), tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::DIGIT(2), tok.current_token);
+    }
+    #[test]
+    fn lexer_test_assign() {
+        let mut tok = Lexer::new("1=2").unwrap();
+        assert_eq!(Token::DIGIT(1), tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::ASSIGN, tok.current_token);
         tok.get_next_token();
         assert_eq!(Token::DIGIT(2), tok.current_token);
     }
@@ -751,6 +812,16 @@ mod tests {
         assert_eq!("1 2 +", Translator::new("1+2").unwrap().to_rpn().unwrap())
     }
 
-   
+   #[test]
+   fn basic_declaration() {
+       assert_eq!(
+           ASTreeNode::new_with_values(
+               Token::Type(Type::INT), 
+               Some(Box::new(ASTreeNode::new(Token::IDENT("a".into())))), 
+               Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))), 
+               ), 
+            Parser::new("int a = 3").unwrap().statement().unwrap()
+           )
+   }
 
 }
