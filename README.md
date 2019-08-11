@@ -11,7 +11,6 @@ LPAREN | ' ( '
 RPAREN | ' ) '
 ASSIGN | ' = '
 COMMA  | ' , '
-INT    | ' int '
 DIGIT  | 123
 FLOAT  | 3.14
 ADDOP  | ' + ' , ' - '
