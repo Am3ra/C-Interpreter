@@ -34,11 +34,11 @@ name | definition
 program  | MAIN block
 block  | LBRACE statement_list RBRACE
 statement_list  | [statement *(SEMI statement) [SEMI]]
-statement  | (expr SEMI `|` declaration `|` block) 
+statement  | (expr SEMI `\|` declaration `\|` block) 
 expr  | addop *(ASSIGN expr)
 addop  | term *((PLUS/MINUS) expr)
 mulop  | atom ((MUL/DIV) expr)
-atom  | (PLUS/MINUS) atom `|`  INTEGER `|`   LPAREN expr RPAREN `|` IDENTIFIER
+atom  | (PLUS/MINUS) atom `\|`  INTEGER `\|`   LPAREN expr RPAREN `\|` IDENTIFIER
 declaration  | type IDENTIFIER [ASSIGN expr] SEMI
 type  | INT,FLOAT //TODO: IMPLEMENT FLOAT
 
@@ -50,3 +50,5 @@ name | definition
 function | TYPE IDENTIFIER argument_list block
 argument_list | LPAREN argument  *(COMMA argument)  RPAREN
 argument | TYPE IDENT
+
+TODO    
