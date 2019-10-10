@@ -538,7 +538,14 @@ impl Interpreter{
     }
 
     pub fn interpret_expr(&mut self)->Result<i32,String>{
-        Interpreter::interpret_input(self.parser.expr()?)
+        let result = Interpreter::interpret_input(self.parser.expr()?);
+
+        match result{
+            Ok(i)=> {println!("Result for line: {}",i);
+                    return Ok(i)},
+            Err(i)=> return Err(i)
+        } 
+
     }
 
     pub fn interpret_block(& mut self)->Result<i32,String>{
