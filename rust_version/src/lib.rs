@@ -45,6 +45,15 @@ use std::iter::FromIterator;
  * 4: ASSIGNMENT, =, +=, -=, *=. /=, %=, (RIGHT TO LEFT ASS.) 
  */
 
+
+/**
+ * TODO: Implement simple namespace
+ *       !Make interpreter print lines results
+ */
+
+
+
+
 #[derive(Clone,Debug,PartialEq)]
 enum Type{
     INT
@@ -115,7 +124,8 @@ impl Lexer{
 
     fn identifier(&mut self)->Token{
         let mut string_so_far = String::new();
-        while self.position < self.len  && self.input[self.position].is_alphanumeric(){
+        while self.position < self.len  && 
+                self.input[self.position].is_alphanumeric(){
             string_so_far.push( self.input[self.position]);
             self.position+=1;
         }
