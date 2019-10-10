@@ -288,7 +288,7 @@ impl Parser {
                 Ok(ASTreeNode::new(Token::DIGIT(i)))
                 },
             Token::LPAREN=> {
-                self.lexer.get_next_token();                
+                self.lexer.get_next_token();
                 let result = self.expr();
                 match self.lexer.current_token{
                     Token::RPAREN=> {
@@ -705,6 +705,43 @@ mod tests {
      #[test]
     fn interp_block() {
         let root = Parser::new("{}");
+        assert_eq!(
+            ASTreeNode::new(Token::StatementList(Vec::new()))
+            ,
+            root.unwrap().parse_block().unwrap()
+            )
+    }
+     #[test]
+    fn interp_block_basic() {
+        let root = Parser::new("{1+2;}");
+        assert_eq!(
+            ASTreeNode::new(
+                Token::StatementList(
+                    vec![
+                        ASTreeNode::new_with_values(
+                            Token::ADDOP(AddOp::PLUS), 
+                            Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))), 
+                            Some(Box::new(ASTreeNode::new(Token::DIGIT(2))))
+                            )
+                        ]))
+            ,
+            root.unwrap().parse_block().unwrap()
+            )
+    }
+    
+    #[test]
+    fn interp_block2() {
+        let root = Parser::new("{1+2;3+2;}");
+        assert_eq!(
+            ASTreeNode::new(Token::StatementList(Vec::new()))
+            ,
+            root.unwrap().parse_block().unwrap()
+            )
+    }
+
+    #[test]
+    fn interp_block_with_assign() {
+        let root = Parser::new("{1+2;3+2; int a = 3;}");
         assert_eq!(
             ASTreeNode::new(Token::StatementList(Vec::new()))
             ,
