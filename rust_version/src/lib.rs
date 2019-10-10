@@ -11,7 +11,7 @@ use std::iter::FromIterator;
  * 
  * program : MAIN block
  * block : LBRACE statement_list RBRACE,
- * statement_list : 1*(statement)
+ * statement_list : [statement *(SEMI statement) [SEMI]] 
  * statement : (expr SEMI | declaration | block) 
  * expr : addop *(ASSIGN expr)
  * addop : term *((PLUS/MINUS) expr)
@@ -465,7 +465,7 @@ impl Parser {
                 Ok(result)
             }
             else {
-                Err("Expected '}".into())
+                Err("Expected '}'".into())
             }
         }
         else {
@@ -733,7 +733,20 @@ mod tests {
     fn interp_block2() {
         let root = Parser::new("{1+2;3+2;}");
         assert_eq!(
-            ASTreeNode::new(Token::StatementList(Vec::new()))
+            ASTreeNode::new(
+                Token::StatementList(
+                    vec![
+                        ASTreeNode::new_with_values(
+                            Token::ADDOP(AddOp::PLUS), 
+                            Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))), 
+                            Some(Box::new(ASTreeNode::new(Token::DIGIT(2))))
+                            ),
+                        ASTreeNode::new_with_values(
+                            Token::ADDOP(AddOp::PLUS), 
+                            Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))), 
+                            Some(Box::new(ASTreeNode::new(Token::DIGIT(2))))
+                            )
+                        ]))
             ,
             root.unwrap().parse_block().unwrap()
             )
