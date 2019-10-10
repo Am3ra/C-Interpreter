@@ -38,7 +38,7 @@ statement  | (expr SEMI \| declaration \| block)
 expr  | addop *(ASSIGN expr)
 addop  | term *((PLUS/MINUS) expr)
 mulop  | atom ((MUL/DIV) expr)
-atom  | (PLUS/MINUS) atom `\|`  INTEGER `\|`   LPAREN expr RPAREN `\|` IDENTIFIER
+atom  | (PLUS/MINUS) atom \|  INTEGER \|   LPAREN expr RPAREN \| IDENTIFIER
 declaration  | type IDENTIFIER [ASSIGN expr] SEMI
 type  | INT,FLOAT //TODO: IMPLEMENT FLOAT
 
