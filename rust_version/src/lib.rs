@@ -485,7 +485,7 @@ impl Parser {
 
 pub struct Interpreter {
     parser: Parser,
-    global_vars: HashMap<String, Type>,
+    global_vars: HashMap<String, Option<Token>>,
 }
 
 impl Interpreter {
@@ -526,7 +526,19 @@ impl Interpreter {
             }
             Token::Type(t) => {
                 if let Token::IDENT(i) = (*(input.left.unwrap())).value {
-                    self.global_vars.get(&i);
+                    match self.global_vars.get(&i){
+                       Some(_j)=>{
+                           return Err("Variable already Exists!".into());
+                       },
+                       _=>{
+                           //record does not exist Create
+                           match t{
+                               Type::INT=>{
+                                   self.global_vars.insert(i,None);
+                                   },
+                           }
+                       } 
+                    }
                 }
                 Err("unknown Err".into())
             }
