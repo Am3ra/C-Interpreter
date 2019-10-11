@@ -42,6 +42,8 @@ atom  | (PLUS/MINUS) atom \|  INTEGER \|   LPAREN expr RPAREN \| IDENTIFIER
 declaration  | type IDENTIFIER [ASSIGN expr] SEMI
 type  | INT,FLOAT //TODO: IMPLEMENT FLOAT
 
+Although rust syntax of the last statement not requiring the final SEMI is desired, it is not possible with current syntax. Changes are proposed to allow it.
+#THE FOLLOWING IS OUTDATED
 Pay attention to the definition of statement list, here I'm saying that it is possible to have an empty statement list, as well as that the last statement doesn't necesarily need a closing SEMI. This is because I'm using rust syntax, in which if the last statement doesn't use a closing semi, it is considered a return value.
 
 ## Proposed Grammar for future versions:
@@ -50,5 +52,6 @@ name | definition
 function | TYPE IDENTIFIER argument_list block
 argument_list | LPAREN argument  *(COMMA argument)  RPAREN
 argument | TYPE IDENT
-
-TODO    
+block  | LBRACE [statement_list] RBRACE
+statement_list  | *(statement SEMI\|block) [statement [SEMI]]
+statement  | (expr \| declaration ) 
