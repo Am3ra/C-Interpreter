@@ -45,7 +45,7 @@ use std::iter::FromIterator;
 
 /**
  * TODO: Implement simple namespace
- *       !Make interpreter print lines results
+ *      Make types hold values? No... Use relevant token, like digit
  */
 
 #[derive(Clone, Debug, PartialEq)]
