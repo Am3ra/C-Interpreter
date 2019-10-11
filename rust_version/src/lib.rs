@@ -496,37 +496,37 @@ impl Interpreter {
         })
     }
 
-    fn interpret_input(input: ASTreeNode) -> Result<i32, String> {
+    fn interpret_input(&mut self,input: ASTreeNode) -> Result<i32, String> {
         match input.value {
             Token::DIGIT(n) => Ok(n),
             Token::ADDOP(n) => match n {
-                AddOp::MINUS => Ok(Interpreter::interpret_input(*input.left.unwrap())?
-                    - Interpreter::interpret_input(*input.right.unwrap())?),
-                AddOp::PLUS => Ok(Interpreter::interpret_input(*input.left.unwrap())?
-                    + Interpreter::interpret_input(*input.right.unwrap())?),
+                AddOp::MINUS => Ok(self.interpret_input(*input.left.unwrap())?
+                    - self.interpret_input(*input.right.unwrap())?),
+                AddOp::PLUS => Ok(self.interpret_input(*input.left.unwrap())?
+                    + self.interpret_input(*input.right.unwrap())?),
             },
             Token::MULOP(n) => match n {
-                MulOp::MULT => Ok(Interpreter::interpret_input(*input.left.unwrap())?
-                    * Interpreter::interpret_input(*input.right.unwrap())?),
-                MulOp::DIV => Ok(Interpreter::interpret_input(*input.left.unwrap())?
-                    / Interpreter::interpret_input(*input.right.unwrap())?),
-                MulOp::MODU => Ok(Interpreter::interpret_input(*input.left.unwrap())?
-                    % Interpreter::interpret_input(*input.right.unwrap())?),
+                MulOp::MULT => Ok(self.interpret_input(*input.left.unwrap())?
+                    * self.interpret_input(*input.right.unwrap())?),
+                MulOp::DIV => Ok(self.interpret_input(*input.left.unwrap())?
+                    / self.interpret_input(*input.right.unwrap())?),
+                MulOp::MODU => Ok(self.interpret_input(*input.left.unwrap())?
+                    % self.interpret_input(*input.right.unwrap())?),
             },
             Token::UNOP(n) => match n {
-                UnaryOp::PLUS => Ok(Interpreter::interpret_input(*input.left.unwrap())?),
-                UnaryOp::MINUS => Ok(-Interpreter::interpret_input(*input.left.unwrap())?),
+                UnaryOp::PLUS => Ok(self.interpret_input(*input.left.unwrap())?),
+                UnaryOp::MINUS => Ok(-self.interpret_input(*input.left.unwrap())?),
             },
             Token::StatementList(list) => {
                 let mut result = Err("Error parsing result".into());
                 for i in list {
-                    result = Ok(Interpreter::interpret_input(i)?);
+                    result = Ok(self.interpret_input(i)?);
                 }
                 result
             }
             Token::Type(t) => {
-                if let Some(i) = input.left {
-                    
+                if let Token::IDENT(i) = (*(input.left.unwrap())).value {
+                    self.global_vars.get(&i);
                 }
                 Err("unknown Err".into())
             }
@@ -535,11 +535,12 @@ impl Interpreter {
     }
 
     pub fn interpret_expr(&mut self) -> Result<i32, String> {
-        Interpreter::interpret_input(self.parser.expr()?)
+        let curr = self.parser.statement()?;
+        self.interpret_input(curr)
     }
-
     pub fn interpret_block(&mut self) -> Result<i32, String> {
-        Interpreter::interpret_input(self.parser.parse_block()?)
+        let curr = self.parser.parse_block()?;
+        self.interpret_input(curr)
     }
 }
 
@@ -682,52 +683,28 @@ mod tests {
     }
     #[test]
     fn basic_interp_plus() {
-        let root = ASTreeNode::new_with_values(
-            Token::ADDOP(AddOp::PLUS),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))),
-        );
-        assert_eq!(3, Interpreter::interpret_input(root).unwrap());
+        assert_eq!(3, Interpreter::new("1+2").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn basic_interp_minus() {
-        let root = ASTreeNode::new_with_values(
-            Token::ADDOP(AddOp::MINUS),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(1)))),
-        );
-        assert_eq!(1, Interpreter::interpret_input(root).unwrap());
+        assert_eq!(1, Interpreter::new("2-1").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn basic_interp_times() {
-        let root = ASTreeNode::new_with_values(
-            Token::MULOP(MulOp::MULT),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
-        );
-        assert_eq!(6, Interpreter::interpret_input(root).unwrap());
+
+        assert_eq!(6, Interpreter::new("2*3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn basic_interp_divide() {
-        let root = ASTreeNode::new_with_values(
-            Token::MULOP(MulOp::DIV),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
-        );
-        assert_eq!(0, Interpreter::interpret_input(root).unwrap());
+        assert_eq!(0, Interpreter::new("2/3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
     fn basic_interp_modulo() {
-        let root = ASTreeNode::new_with_values(
-            Token::MULOP(MulOp::MODU),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(2)))),
-            Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
-        );
-        assert_eq!(2, Interpreter::interpret_input(root).unwrap());
+        assert_eq!(2, Interpreter::new("2%3").unwrap().interpret_expr().unwrap());
     }
 
     #[test]
