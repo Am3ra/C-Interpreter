@@ -511,22 +511,34 @@ impl Interpreter {
         })
     }
 
-    fn interpret_input(&mut self,input: ASTreeNode) -> Result<i32, String> {
+    // fn find_var(input: &str) ->
+
+    fn interpret_input(&mut self, input: ASTreeNode) -> Result<Option<i32>, String> {
         match input.value {
-            Token::DIGIT(n) => Ok(n),
+            Token::DIGIT(n) => Ok(Some(n)),
             Token::ADDOP(n) => match n {
-                AddOp::MINUS => Ok(self.interpret_input(*input.left.unwrap())?
-                    - self.interpret_input(*input.right.unwrap())?),
-                AddOp::PLUS => Ok(self.interpret_input(*input.left.unwrap())?
-                    + self.interpret_input(*input.right.unwrap())?),
+                AddOp::MINUS => Ok(Some(
+                    self.interpret_input(*input.left.unwrap())?.unwrap()
+                        - self.interpret_input(*input.right.unwrap())?.unwrap(),
+                )),
+                AddOp::PLUS => Ok(Some(
+                    self.interpret_input(*input.left.unwrap())?.unwrap()
+                        + self.interpret_input(*input.right.unwrap())?.unwrap(),
+                )),
             },
             Token::MULOP(n) => match n {
-                MulOp::MULT => Ok(self.interpret_input(*input.left.unwrap())?
-                    * self.interpret_input(*input.right.unwrap())?),
-                MulOp::DIV => Ok(self.interpret_input(*input.left.unwrap())?
-                    / self.interpret_input(*input.right.unwrap())?),
-                MulOp::MODU => Ok(self.interpret_input(*input.left.unwrap())?
-                    % self.interpret_input(*input.right.unwrap())?),
+                MulOp::MULT => Ok(Some(
+                    self.interpret_input(*input.left.unwrap())?.unwrap()
+                        * self.interpret_input(*input.right.unwrap())?.unwrap(),
+                )),
+                MulOp::DIV => Ok(Some(
+                    self.interpret_input(*input.left.unwrap())?.unwrap()
+                        / self.interpret_input(*input.right.unwrap())?.unwrap(),
+                )),
+                MulOp::MODU => Ok(Some(
+                    self.interpret_input(*input.left.unwrap())?.unwrap()
+                        % self.interpret_input(*input.right.unwrap())?.unwrap(),
+                )),
             },
             Token::UNOP(n) => match n {
                 UnaryOp::PLUS => Ok(self.interpret_input(*input.left.unwrap())?),
