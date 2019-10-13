@@ -19,7 +19,7 @@ use std::iter::FromIterator;
  *          LPAREN expr RPAREN
  * declaration : type IDENTIFIER [ASSIGN expr] SEMI // might not need SEMI later
  * assignment : identifier ASSIGN expr
- * type : INT,FLOAT //TODO: IMPLEMENT FLOAT
+ * type : INT|FLOAT //TODO: IMPLEMENT FLOAT
  * identifier : alphabetic *(alphanumeric) //don't know how to write this
  * LBRACE = '{'
  * RBRACE = '}'
@@ -275,7 +275,7 @@ impl Parser {
     }
 
     fn atom(&mut self) -> Result<ASTreeNode, String> {
-        match self.lexer.current_token {
+        match self.lexer.current_token.clone() {
             Token::DIGIT(i) => {
                 self.lexer.get_next_token();
                 Ok(ASTreeNode::new(Token::DIGIT(i)))
@@ -376,7 +376,7 @@ impl Parser {
         Ok(left)
     }
 
-    pub fn expr(&mut self) -> Result<ASTreeNode, String> {
+    fn expr(&mut self) -> Result<ASTreeNode, String> {
         let left = self.addop()?;
         if Token::ASSIGN == self.lexer.current_token {
             self.lexer.get_next_token();
@@ -389,7 +389,19 @@ impl Parser {
         Ok(left)
     }
 
+    pub fn return_value(&mut self) -> Result<ASTreeNode, String> {
+        if Token::RET == self.lexer.current_token {
+            self.lexer.get_next_token();
+            let mut current = ASTreeNode::new(Token::RET);
+            current.left = Some(Box::new(self.expr()?));
+            Ok(current)
+        } else {
+            self.expr()
+        }
+    }
+
     fn declaration(&mut self) -> Result<ASTreeNode, String> {
+        // declaration : type IDENTIFIER [ASSIGN expr] SEMI
         if let Token::Type(_i) = self.lexer.current_token.clone() {
             let mut result = ASTreeNode::new(self.lexer.current_token.clone());
             self.lexer.get_next_token();
