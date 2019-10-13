@@ -46,6 +46,7 @@ use std::iter::FromIterator;
 /**
  * TODO: Implement simple namespace
  *      Make types hold values? No... Use relevant token, like digit
+ *      figure out type system...
  */
 
 #[derive(Clone, Debug, PartialEq)]
@@ -411,23 +412,18 @@ impl Parser {
 
                 self.lexer.get_next_token();
 
-                match self.lexer.current_token {
-                    Token::SEMI => {
-                        self.lexer.get_next_token();
-                        return Ok(result);
-                    }
-                    Token::ASSIGN => {
-                        self.lexer.get_next_token();
-                        result.right = Some(Box::new(self.expr()?));
-                        return Ok(result);
-                    }
-                    _ => return Err("Expected '=' or ';'".into()),
+                if self.lexer.current_token == Token::ASSIGN {
+                    self.lexer.get_next_token();
+                    result.right = Some(Box::new(self.expr()?));
+                    return Ok(result);
+                } else {
+                    return Ok(result);
                 }
             } else {
                 return Err("Parsing Error: Expected identifier".into());
             }
         } else {
-            Err("Expected type".into())
+            Err("Parsing error: Expected type".into())
         }
     }
 
@@ -437,7 +433,7 @@ impl Parser {
         */
         match self.lexer.current_token.clone() {
             Token::Type(_i) => self.declaration(),
-            _ => self.expr(),
+            _ => self.return_value(),
         }
     }
 
@@ -461,6 +457,7 @@ impl Parser {
                         self.lexer.get_next_token();
                         statements_vec.push(curr);
                     } else {
+                        println!("{:?}", self.lexer.current_token);
                         return Err("Expected SEMI".into());
                     }
                 }
@@ -511,7 +508,29 @@ impl Interpreter {
         })
     }
 
-    // fn find_var(input: &str) ->
+    fn interpret_statement(&mut self, input: ASTreeNode)->Result<Option<i32>, String>{
+       let mut result = Ok(None);
+
+       if input.value == Token::RET{
+           result = self.interpret_input(input);
+       }else{
+           self.interpret_input(input)?;
+       }
+
+        result
+    }
+
+    fn find_var(&mut self, input: &str) -> Option<&Option<Token>>{
+        self.global_vars.get(input)
+    }
+
+    fn declare_var(&mut self,  name: String, value:Option<Token>)->Result<(),String>{
+        match self.global_vars.insert(name, value){
+            None=>Ok(()),
+            Some(_)=>Err("Interpreting Error: Unable to declare Var.".into())
+        }
+        
+    }
 
     fn interpret_input(&mut self, input: ASTreeNode) -> Result<Option<i32>, String> {
         match input.value {
@@ -542,42 +561,67 @@ impl Interpreter {
             },
             Token::UNOP(n) => match n {
                 UnaryOp::PLUS => Ok(self.interpret_input(*input.left.unwrap())?),
-                UnaryOp::MINUS => Ok(-self.interpret_input(*input.left.unwrap())?),
+                UnaryOp::MINUS => Ok(Some(-self.interpret_input(*input.left.unwrap())?.unwrap())),
             },
             Token::StatementList(list) => {
-                let mut result = Err("Error parsing result".into());
-                for i in list {
-                    result = Ok(self.interpret_input(i)?);
+                if list.is_empty(){
+                    return Ok(None);
                 }
-                result
+                for i in list {
+
+                    // TODO: make interpret statement fn
+                    // TODO: while intepret_statement() == None
+                    if let Some(i) = self.interpret_statement(i)?{
+                        return Ok(Some(i))
+                    }
+                }
+                Err("Error parsing result".into())
             }
             Token::Type(t) => {
                 if let Token::IDENT(i) = (*(input.left.unwrap())).value {
-                    match self.global_vars.get(&i){
-                       Some(_j)=>{
-                           return Err("Variable already Exists!".into());
-                       },
-                       _=>{
-                           //record does not exist Create
-                           match t{
-                               Type::INT=>{
-                                   self.global_vars.insert(i,None);
-                                   },
-                           }
-                       } 
+                    if let Some(_) = self.find_var(&i) {
+                        return Err("Variable already declared!".into());
+                    }else{
+                        if let Some(j)=input.right{
+                            self.declare_var(i, Some((*j).value))?;
+                        }else{
+                            self.declare_var(i, None)?;
+                        }
+                        Ok(None)
                     }
+                }else{
+                    Err("Interpreting Error: Expected identifier".into())
                 }
-                Err("unknown Err".into())
-            }
-            _ => Err("Unknown Token".into()),
+            },
+            Token::IDENT(i)=>{
+                match self.find_var(&i){
+                    Some(j)=>match j{
+                        Some(Token::DIGIT(k))=>Ok(Some(k.to_owned())),
+                        Some(_)=>Err("Interpreting Error: Varibale of unrecognized type, unknown reason".into()),
+                        None=>Err("Interpreting Error: Variable not initialized".into())
+                    }
+                    None=>Err("Interpreting Error: Variable Not Declared".into())
+                }
+            },
+            Token::RET=>{
+                if let Some(i) = input.left{
+                    Ok(self.interpret_input(*i)?)
+                }else{
+                    Err("Interpreting error: no argument to return statement".into())
+                }
+            },
+            _ =>{
+                    println!("Current Err ASTNODE: {:?}", input);
+                    Err("Interpreting Error: Unknown Token".into())
+                 },
         }
     }
 
-    pub fn interpret_expr(&mut self) -> Result<i32, String> {
+    pub fn interpret_block(&mut self) -> Result<Option<i32>, String> {
         let curr = self.parser.statement()?;
         self.interpret_input(curr)
     }
-    pub fn interpret_block(&mut self) -> Result<i32, String> {
+    pub fn interpret_program(&mut self) -> Result<Option<i32>, String> {
         let curr = self.parser.parse_block()?;
         self.interpret_input(curr)
     }
@@ -659,7 +703,11 @@ mod tests {
     fn basic_add() {
         assert_eq!(
             3,
-            Interpreter::new("1+2").unwrap().interpret_expr().unwrap()
+            Interpreter::new("1+2")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
         );
     }
 
@@ -667,7 +715,11 @@ mod tests {
     fn unary_minus() {
         assert_eq!(
             3,
-            Interpreter::new("--3").unwrap().interpret_expr().unwrap()
+            Interpreter::new("--3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
         );
     }
 
@@ -675,7 +727,11 @@ mod tests {
     fn unary_plus() {
         assert_eq!(
             3,
-            Interpreter::new("++3").unwrap().interpret_expr().unwrap()
+            Interpreter::new("++3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
         );
     }
 
@@ -683,7 +739,11 @@ mod tests {
     fn unary_both() {
         assert_eq!(
             3,
-            Interpreter::new("++3").unwrap().interpret_expr().unwrap()
+            Interpreter::new("++3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
         );
     }
 
@@ -691,7 +751,11 @@ mod tests {
     fn chain_add() {
         assert_eq!(
             6,
-            Interpreter::new("1+2+3").unwrap().interpret_expr().unwrap()
+            Interpreter::new("1+2+3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
         );
     }
 
@@ -699,7 +763,11 @@ mod tests {
     fn precedence_test() {
         assert_eq!(
             7,
-            Interpreter::new("1+2*3").unwrap().interpret_expr().unwrap()
+            Interpreter::new("1+2*3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
         );
     }
 
@@ -707,7 +775,11 @@ mod tests {
     fn precedence_test2() {
         assert_eq!(
             5,
-            Interpreter::new("1*2+3").unwrap().interpret_expr().unwrap()
+            Interpreter::new("1*2+3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
         );
     }
     #[test]
@@ -716,42 +788,84 @@ mod tests {
             9,
             Interpreter::new("(1+2)*3")
                 .unwrap()
-                .interpret_expr()
+                .interpret_block()
+                .unwrap()
                 .unwrap()
         );
     }
     #[test]
     fn basic_interp_plus() {
-        assert_eq!(3, Interpreter::new("1+2").unwrap().interpret_expr().unwrap());
+        assert_eq!(
+            3,
+            Interpreter::new("1+2")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
+        );
     }
 
     #[test]
     fn basic_interp_minus() {
-        assert_eq!(1, Interpreter::new("2-1").unwrap().interpret_expr().unwrap());
+        assert_eq!(
+            1,
+            Interpreter::new("2-1")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
+        );
     }
 
     #[test]
     fn basic_interp_times() {
-
-        assert_eq!(6, Interpreter::new("2*3").unwrap().interpret_expr().unwrap());
+        assert_eq!(
+            6,
+            Interpreter::new("2*3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
+        );
     }
 
     #[test]
     fn basic_interp_divide() {
-        assert_eq!(0, Interpreter::new("2/3").unwrap().interpret_expr().unwrap());
+        assert_eq!(
+            0,
+            Interpreter::new("2/3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
+        );
     }
 
     #[test]
     fn basic_interp_modulo() {
-        assert_eq!(2, Interpreter::new("2%3").unwrap().interpret_expr().unwrap());
+        assert_eq!(
+            2,
+            Interpreter::new("2%3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
+        );
     }
 
     #[test]
-    fn parse_block() {
+    fn parse_empty_block() {
         let root = Parser::new("{}");
         assert_eq!(
             Ok(ASTreeNode::new(Token::StatementList(Vec::new()))),
             root.unwrap().parse_block()
+        )
+    }
+    #[test]
+    fn interp_empty_block() {
+        assert_eq!(
+            None,
+            Interpreter::new("{}").unwrap().interpret_program().unwrap()
         )
     }
     #[test]
@@ -901,6 +1015,14 @@ mod tests {
         tok.get_next_token();
         assert_eq!(Token::DIGIT(2), tok.current_token);
     }
+
+    #[test]
+    fn lexer_return() {
+        let mut tok = Lexer::new("return a").unwrap();
+        assert_eq!(Token::RET, tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::IDENT("a".into()), tok.current_token);
+    }
     #[test]
     fn lexer_test_assign() {
         let mut tok = Lexer::new("1=2").unwrap();
@@ -948,6 +1070,17 @@ mod tests {
             Parser::new("1+2;").unwrap().statement().unwrap()
         )
     }
+    #[test]
+    fn parser_return() {
+        assert_eq!(
+            ASTreeNode::new_with_values(
+                Token::RET,
+                Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
+                None
+            ),
+            Parser::new("return 3").unwrap().statement().unwrap()
+        )
+    }
 
     #[test]
     fn rpn_translate() {
@@ -966,6 +1099,43 @@ mod tests {
                 Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
             ),
             Parser::new("int a = 3").unwrap().statement().unwrap()
+        )
+    }
+
+    #[test]
+    fn test_vars() {
+        assert_eq!(
+            3,
+            Interpreter::new("{int a = 3; a}")
+                .unwrap()
+                .interpret_program()
+                .unwrap()
+                .unwrap()
+        )
+    }
+    #[test]
+    fn parse_declarations() {
+        assert_eq!(
+            ASTreeNode::new_with_values(
+                Token::StatementList(vec![ASTreeNode::new_with_values(
+                    Token::Type(Type::INT),
+                    Some(Box::new(ASTreeNode::new(Token::IDENT("a".into())))),
+                    Some(Box::new(ASTreeNode::new(Token::DIGIT(3))))
+                )]),
+                None,
+                None
+            ),
+            Parser::new("{int a = 3;}").unwrap().parse_block().unwrap()
+        )
+    }
+
+    #[test]
+    fn double_declaration() {
+        assert_eq!(
+            Interpreter::new("{int a; int a;}")
+                .unwrap()
+                .interpret_program(),
+            Err("Variable already declared!".into())
         )
     }
 
