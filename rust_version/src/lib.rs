@@ -306,7 +306,10 @@ impl Parser {
                 current.left = Some(Box::new(self.atom()?));
                 Ok(current)
             }
-
+            Token::IDENT(i) => {
+                self.lexer.get_next_token();
+                Ok(ASTreeNode::new(Token::IDENT(i)))
+            }
             _ => {
                 println!("Current TOK ERR, {:?}", self.lexer.current_token);
                 Err("Expected digit, '+' , '-' , or '(' ".into())
