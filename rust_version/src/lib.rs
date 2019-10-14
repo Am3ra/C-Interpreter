@@ -584,9 +584,6 @@ impl Interpreter {
                     return Ok(None);
                 }
                 for i in list {
-
-                    // TODO: make interpret statement fn
-                    // TODO: while intepret_statement() == None
                     if let Some(i) = self.interpret_statement(i)?{
                         return Ok(Some(i))
                     }
@@ -623,7 +620,12 @@ impl Interpreter {
                 if let Some(i) = input.left.clone(){
                     if let Token::IDENT(j) = (*i).value {
                         if let Some(k) =  input.right.clone(){
-                            return self.update_var(&j, (*k).value);
+                            if let Some(m) = self.interpret_input(*k)? {
+                                return self.update_var(&j, Token::DIGIT(m));
+                            }
+                            else{
+                                return Err("Unable to resolve r-value".into())
+                            }
                         }else{
                             return Err("No rvalue to assign.".into());
                         }
@@ -1191,7 +1193,7 @@ mod tests {
     }
 
     #[test]
-    fn final_variable_test() {
+    fn variable_test() {
         assert_eq!(
             8,
             Interpreter::new("
@@ -1199,6 +1201,25 @@ mod tests {
                 int b = 3; 
                 b = 5;
                 b+3
+            }
+                ")
+                .unwrap()
+                .interpret_program()
+                .unwrap()
+                .unwrap()
+        )
+    }
+    #[test]
+    fn final_variable_test2() {
+        assert_eq!(
+            14,
+            Interpreter::new("
+            {
+                int b = 3; 
+                int a;
+                a = b+3;
+                b=5;
+                b+3+a
             }
                 ")
                 .unwrap()
