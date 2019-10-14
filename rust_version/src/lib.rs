@@ -519,6 +519,22 @@ impl Interpreter {
 
         result
     }
+    fn update_var(&mut self, name: &str,value: Token)->Result<Option<i32>,String>{
+
+        match self.global_vars.get_mut(name){
+            Some(i)=>{
+                if let Token::DIGIT(j) = value{
+                    *i = Some(value);
+                    return Ok(Some(j));
+                }
+                else{
+                    Err("Unable to use non-digit values".into())
+                }
+            },
+            None=>Err("Interpreter error: Variable does not exist".into())
+        }
+        
+    }
 
     fn find_var(&mut self, input: &str) -> Option<&Option<Token>>{
         self.global_vars.get(input)
@@ -603,6 +619,24 @@ impl Interpreter {
                     None=>Err("Interpreting Error: Variable Not Declared".into())
                 }
             },
+            Token::ASSIGN=>{
+                if let Some(i) = input.left.clone(){
+                    if let Token::IDENT(j) = (*i).value {
+                        if let Some(k) =  input.right.clone(){
+                            return self.update_var(&j, (*k).value);
+                        }else{
+                            return Err("No rvalue to assign.".into());
+                        }
+                    }
+                    else{
+                        println!("current tree:{:?}", input.clone());
+                        return Err("Interpreting error: can't assign value to non-variable".into())
+                    }
+                }else{
+                    println!("current tree:{:?}", input.clone());
+                    Err("Interpreting error: Nothing to left of assignment".into())
+                }
+            }
             Token::RET=>{
                 if let Some(i) = input.left{
                     Ok(self.interpret_input(*i)?)
@@ -1139,4 +1173,38 @@ mod tests {
         )
     }
 
+    #[test]
+    fn different_return_varibale() {
+        assert_eq!(
+            6,
+            Interpreter::new("
+            {
+                int b = 3; 
+                b+3
+            }
+                ")
+                .unwrap()
+                .interpret_program()
+                .unwrap()
+                .unwrap()
+        )
+    }
+
+    #[test]
+    fn final_variable_test() {
+        assert_eq!(
+            8,
+            Interpreter::new("
+            {
+                int b = 3; 
+                b = 5;
+                b+3
+            }
+                ")
+                .unwrap()
+                .interpret_program()
+                .unwrap()
+                .unwrap()
+        )
+    }
 }
