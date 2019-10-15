@@ -139,9 +139,9 @@ impl Lexer {
         }
     }
 
-    fn skip_comment(&mut self){
-        while self.input[self.position] != '\n'{
-            self.position+=1;
+    fn skip_comment(&mut self) {
+        while self.input[self.position] != '\n' {
+            self.position += 1;
         }
     }
 
@@ -169,15 +169,17 @@ impl Lexer {
             '+' => self.current_token = Token::ADDOP(AddOp::PLUS),
             '-' => self.current_token = Token::ADDOP(AddOp::MINUS),
             '*' => self.current_token = Token::MULOP(MulOp::MULT),
-            '/' => if let Some(n) = self.peek() {
-                    match n{
-                        '/'=> {
+            '/' => {
+                if let Some(n) = self.peek() {
+                    match n {
+                        '/' => {
                             self.skip_comment();
                             self.get_next_token();
-                        },
-                        _=>self.current_token = Token::MULOP(MulOp::DIV),
+                        }
+                        _ => self.current_token = Token::MULOP(MulOp::DIV),
                     }
-                },
+                }
+            }
             '%' => self.current_token = Token::MULOP(MulOp::MODU),
             '(' => self.current_token = Token::LPAREN,
             ')' => self.current_token = Token::RPAREN,
@@ -565,20 +567,18 @@ impl Interpreter {
         self.global_vars.get(input)
     }
     fn var_declared(&mut self, input: &str) -> bool {
-        if let Some(i)=self.scope.last(){
-            match (*i).get(input){
-                Some(_)=>true,
-                None=>false,
+        if let Some(i) = self.scope.last() {
+            match (*i).get(input) {
+                Some(_) => true,
+                None => false,
             }
-        }else{
-            match self.global_vars.get(input){
-                Some(_)=>true,
-                None=>false,
+        } else {
+            match self.global_vars.get(input) {
+                Some(_) => true,
+                None => false,
             }
         }
     }
-
-
 
     fn declare_var(&mut self, name: String, value: Option<Token>) -> Result<(), String> {
         if self.scope.is_empty() {
