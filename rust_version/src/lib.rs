@@ -814,6 +814,7 @@ mod tests {
     }
 
     #[test]
+
     fn unary_minus() {
         assert_eq!(
             Token::DIGIT(3),
