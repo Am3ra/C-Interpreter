@@ -1309,6 +1309,7 @@ mod tests {
             {
                 int b = 3; 
                 {
+                    //this is in a different scope
                     int b = 2
                 }
                 b
