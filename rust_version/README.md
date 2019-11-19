@@ -1,6 +1,7 @@
 # Cyclone
 Writing and Improvising a C-Clone interpreter 
 
+
 ## The language tokens being considered are:
 
 TOKEN | EXAMPLE
@@ -33,13 +34,15 @@ name | definition
 ---|---
 program  | MAIN block
 block  | LBRACE statement_list RBRACE
-statement_list  | [statement *(SEMI statement) [SEMI]]
-statement  | (expr SEMI \| declaration \| block) 
+function | FN IDENTIFIER LPAREN argList RPAREN [-> type] block
+argList | [type IDENTIFIER *(COMMA type IDENTIFIER)]
+statement_list  | *(statement SEMI\|block) [statement [SEMI]]
+statement  | (expr \| declaration ) 
 expr  | addop *(ASSIGN expr)
 addop  | term *((PLUS/MINUS) expr)
 mulop  | atom ((MUL/DIV) expr)
 atom  | (PLUS/MINUS) atom \|  INTEGER \|   LPAREN expr RPAREN \| IDENTIFIER
-declaration  | type IDENTIFIER [ASSIGN expr] SEMI
+declaration  | type IDENTIFIER [ASSIGN expr]
 type  | INT,FLOAT //TODO: IMPLEMENT FLOAT
 
 Although rust syntax of the last statement not requiring the final SEMI is desired, it is not possible with current syntax. Changes are proposed to allow it.

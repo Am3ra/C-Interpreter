@@ -50,15 +50,16 @@ use std::iter::FromIterator;
  */
 
 enum Category{
-    FUNCTION(Type, ASTreeNode),
+    FUNCTION(Type, Box<ASTreeNode>),
     VAR(Type)
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
-    INT(i32),
-    FLOAT(f32),
-    STRING(String)
+    INT,
+    FLOAT,
+    STRING,
+    FUNC
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -81,11 +82,11 @@ pub enum Token {
     GE,
     ASSIGN,
     EOF,
-    Type(Type),
     IDENT(String),
     StatementList(Vec<ASTreeNode>),
     RET,
     ARROW,
+    Type(Type)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -164,10 +165,10 @@ impl Lexer {
         }
     }
 
-    pub fn get_next_token(&mut self) -> Token{
+    pub fn get_next_token(&mut self){
         if self.position >= self.len {
             self.current_token = Token::EOF;
-            return self.current_token;
+            return;
         }
         let mut current_char = self.input[self.position];
 
@@ -178,13 +179,12 @@ impl Lexer {
 
         if current_char.is_digit(10) {
             self.current_token = self.digit();
-            return self.current_token;
-
+            return;
         }
 
         if current_char.is_alphabetic() {
             self.current_token = self.identifier();
-            return self.current_token;
+            return;
         }
         self.position += 1;
 
@@ -255,7 +255,7 @@ impl Lexer {
             }
             _ => panic!("UNRECOGNIZED TOKEN: {}", current_char),
         }
-        return self.current_token;
+        
 
     }
 
@@ -269,6 +269,7 @@ impl Lexer {
             ("int".into(), Token::Type(Type::INT)),
             ("test".into(), Token::EOF),
             ("return".into(), Token::RET),
+            ("fn".into(), Token::Type(Type::FUNC)),
         ]);
         let mut lex = Lexer {
             len: input.len(),
@@ -332,6 +333,10 @@ impl Parser {
             Token::DIGIT(i) => {
                 self.lexer.get_next_token();
                 Ok(ASTreeNode::new(Token::DIGIT(i)))
+            }
+            Token::FLOAT(i) => {
+                self.lexer.get_next_token();
+                Ok(ASTreeNode::new(Token::FLOAT(i)))
             }
             Token::LPAREN => {
                 self.lexer.get_next_token();
@@ -442,6 +447,12 @@ impl Parser {
         Ok(left)
     }
 
+    fn get_arg_list(&self) -> Result<Vec<(Type,String)>,String>{
+        // let mut result : Vec<(Type,String)> = Vec::new();
+
+        Err("Unknown Parsing Error".into())
+    }
+
     pub fn return_value(&mut self) -> Result<ASTreeNode, String> {
         if Token::RET == self.lexer.current_token {
             self.lexer.get_next_token();
@@ -455,11 +466,11 @@ impl Parser {
 
     fn declaration(&mut self) -> Result<ASTreeNode, String> {
         // declaration : type IDENTIFIER [ASSIGN expr] SEMI
-        if let Token::Type(_i) = self.lexer.current_token.clone() {
+        if let Token::Type(_) = self.lexer.current_token {
             let mut result = ASTreeNode::new(self.lexer.current_token.clone());
             self.lexer.get_next_token();
 
-            if let Token::IDENT(_i) = self.lexer.current_token.clone() {
+            if let Token::IDENT(_i) = &self.lexer.current_token {
                 result.left = Some(Box::new(ASTreeNode::new(self.lexer.current_token.clone())));
 
                 self.lexer.get_next_token();
@@ -471,10 +482,52 @@ impl Parser {
                 } else {
                     return Ok(result);
                 }
-            } else {
+            } 
+            else {
                 return Err("Parsing Error: Expected identifier".into());
             }
-        } else {
+        } 
+        // else if Token::FUNCTION == self.lexer.current_token{
+        //     let mut result = ASTreeNode::new(Token::FUNCTION);
+        //     // expect IDENT
+
+        //     if let Token::IDENT(i) = self.lexer.get_next_token() {
+        //         //Expect PARENS/ARGS LIST
+        //         if  Token::LPAREN == self.lexer.get_next_token() {
+        //             self.lexer.get_next_token();
+        //             let args = self.get_arg_list()?;
+        //             let mut func_type : Option<Type> = None;
+        //             if Token::RPAREN == self.lexer.get_next_token(){
+        //                 if Token::ARROW == self.lexer.get_next_token(){
+        //                     if let Token::Type(i) = self.lexer.get_next_token(){
+        //                         func_type = Some(i);
+
+        //                     }
+        //                     else{
+        //                         Err("Expected Type!".into())
+        //                     }
+        //                 }else{
+                            
+        //                 }
+        //             }
+        //             else{
+        //                 Err("expected ')'".into())
+        //             }
+        //         }else{
+        //             Err("expected '('".into())
+        //         }
+        //         // EXPECT TYPE OR NONE
+
+        //         // EXPECT BLOCK
+        //     }else{
+        //         Err("Expected Function Name".into())
+        //     }
+
+            
+
+        //     // Err("unfinished implementation".into())
+        // }
+        else {
             Err("Parsing error: Expected type".into())
         }
     }
@@ -634,20 +687,14 @@ impl Interpreter {
         }
     }
 
-    fn interpret_input(&mut self, input: ASTreeNode) -> Result<Option<Token>, String> {
-        match input.clone().value {
-            Token::DIGIT(_) => Ok(Some(input.value)),
-            Token::IDENT(i) => match self.find_var(&i) {
-                Some(j) => match j {
-                    Some(k) => Ok(Some((*k).clone())),
-                    None => Err("Interpreting Error: Variable not initialized".into()),
-                },
-                None => Err("Interpreting Error: Variable Not Declared".into()),
-            },
-            Token::ADDOP(_) | Token::MULOP(_) => {
+
+    // fn add(&mut self, input: ASTreeNode) -> Result<Option<Token>, String> 
+
+    fn add(&mut self, input: ASTreeNode) -> Result<Option<Token>, String> {
+
                 if let Some(j) = input.left {
                     if let Some(k) = input.right {
-                        if let Some(Token::DIGIT(m)) = self.interpret_input(*j)? {
+                if let Some(Token::DIGIT(m)) = self.interpret_input(*(j.clone()))? {
                             if let Some(Token::DIGIT(n)) = self.interpret_input(*k)? {
                                 match input.value {
                                     Token::ADDOP(AddOp::PLUS) => Ok(Some(Token::DIGIT(m + n))),
@@ -655,16 +702,28 @@ impl Interpreter {
                                     Token::MULOP(MulOp::MULT) => Ok(Some(Token::DIGIT(m * n))),
                                     Token::MULOP(MulOp::DIV) => Ok(Some(Token::DIGIT(m / n))),
                                     Token::MULOP(MulOp::MODU) => Ok(Some(Token::DIGIT(m % n))),
-                                    _ => {
-                                        Err("Unkown interpreting error - unexpected operations"
-                                            .into())
-                                    }
+                            _ => Err("Unkown interpreting error - unexpected operations".into()),
                                 }
                             } else {
                                 Err("R-value cannot be non-digit item".into())
                             }
+                }else if let Some(Token::FLOAT(m)) = self.interpret_input(*j)? {
+                    if let Some(Token::FLOAT(n)) = self.interpret_input(*k)? {
+                        match input.value {
+                            Token::ADDOP(AddOp::PLUS) => Ok(Some(Token::FLOAT(m + n))),
+                            Token::ADDOP(AddOp::MINUS) => Ok(Some(Token::FLOAT(m - n))),
+                            Token::MULOP(MulOp::MULT) => Ok(Some(Token::FLOAT(m * n))),
+                            Token::MULOP(MulOp::DIV) => Ok(Some(Token::FLOAT(m / n))),
+                            Token::MULOP(MulOp::MODU) => Ok(Some(Token::FLOAT(m % n))),
+                            _ => Err("Unkown interpreting error - unexpected operations".into()),
+                        }
                         } else {
-                            Err("L-value cannot be non-digit item".into())
+                        Err("R-value cannot be non-float item".into())
+                    }
+                }
+                
+                 else {
+                    Err("L-value must be float or digit item".into())
                         }
                     } else {
                         Err("interpreting error, need r - value in operation.".into())
@@ -673,6 +732,19 @@ impl Interpreter {
                     Err("Need at least two values to add".into())
                 }
             }
+
+    fn interpret_input(&mut self, input: ASTreeNode) -> Result<Option<Token>, String> {
+        match input.clone().value {
+            Token::DIGIT(_) => Ok(Some(input.value)),
+            Token::FLOAT(_) => Ok(Some(input.value)),
+            Token::IDENT(i) => match self.find_var(&i) {
+                Some(j) => match j {
+                    Some(k) => Ok(Some((*k).clone())),
+                    None => Err("Interpreting Error: Variable not initialized".into()),
+                },
+                None => Err("Interpreting Error: Variable Not Declared".into()),
+            },
+            Token::ADDOP(_) | Token::MULOP(_) => self.add(input),
 
             Token::UNOP(i) => {
                 if let Some(j) = input.clone().left {
@@ -838,6 +910,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn lexer_test_float() {
+        let mut tok = Lexer::new("1.2+2.3").unwrap();
+        assert_eq!(Token::FLOAT(1.2), tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::ADDOP(AddOp::PLUS), tok.current_token);
+        tok.get_next_token();
+        assert_eq!(Token::FLOAT(2.3), tok.current_token);
+    }
+
+    #[test]
+    fn basic_add_float() {
+        assert_eq!(
+            Token::FLOAT(1.4+2.3),
+            Interpreter::new("1.4+2.3")
+                .unwrap()
+                .interpret_block()
+                .unwrap()
+                .unwrap()
+        );
+    }
+
+    #[test]
     fn basic_add() {
         assert_eq!(
             Token::DIGIT(3),
@@ -850,7 +944,6 @@ mod tests {
     }
 
     #[test]
-
     fn unary_minus() {
         assert_eq!(
             Token::DIGIT(3),
@@ -1177,6 +1270,11 @@ mod tests {
         assert_eq!(Token::Type(Type::INT), tok.current_token);
         tok.get_next_token();
         assert_eq!(Token::IDENT("a".into()), tok.current_token);
+    }
+    #[test]
+    fn atom_test_float() {
+        let mut pars = Parser::new("1.2+2").unwrap();
+        assert_eq!(Ok(ASTreeNode::new(Token::FLOAT(1.2))), pars.atom())
     }
 
     #[test]
