@@ -17,7 +17,7 @@ use std::iter::FromIterator;
  * atom : (PLUS/MINUS) atom |
  *          INTEGER |
  *          LPAREN expr RPAREN
- * declaration : type IDENTIFIER [ASSIGN expr] SEMI // might not need SEMI later
+ * declaration : type IDENTIFIER [ASSIGN expr] 
  * assignment : identifier ASSIGN expr
  * type : INT|FLOAT //TODO: IMPLEMENT FLOAT
  * identifier : alphabetic *(alphanumeric) //don't know how to write this
@@ -49,13 +49,21 @@ use std::iter::FromIterator;
  *      figure out type system...
  */
 
+enum Category{
+    FUNCTION(Type, ASTreeNode),
+    VAR(Type)
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Type {
-    INT,
+    INT(i32),
+    FLOAT(f32),
+    STRING(String)
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    FLOAT(f32),
     DIGIT(i32),
     ADDOP(AddOp),
     MULOP(MulOp),
@@ -77,6 +85,7 @@ pub enum Token {
     IDENT(String),
     StatementList(Vec<ASTreeNode>),
     RET,
+    ARROW,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -115,7 +124,17 @@ impl Lexer {
             self.position += 1;
         }
 
+        if self.position < self.len && self.input[self.position] == '.' {
+            number_so_far.push(self.input[self.position]);
+            self.position += 1;
+            while self.position < self.len && self.input[self.position].is_digit(10) {
+                number_so_far.push(self.input[self.position]);
+                self.position += 1;
+            }
+            Token::FLOAT(number_so_far.parse().unwrap())
+        } else {
         Token::DIGIT(number_so_far.parse().unwrap())
+    }
     }
 
     fn identifier(&mut self) -> Token {
@@ -145,9 +164,10 @@ impl Lexer {
         }
     }
 
-    pub fn get_next_token(&mut self) {
+    pub fn get_next_token(&mut self) -> Token{
         if self.position >= self.len {
-            return self.current_token = Token::EOF;
+            self.current_token = Token::EOF;
+            return self.current_token;
         }
         let mut current_char = self.input[self.position];
 
@@ -157,17 +177,31 @@ impl Lexer {
         }
 
         if current_char.is_digit(10) {
-            return self.current_token = self.digit();
+            self.current_token = self.digit();
+            return self.current_token;
+
         }
 
         if current_char.is_alphabetic() {
-            return self.current_token = self.identifier();
+            self.current_token = self.identifier();
+            return self.current_token;
         }
         self.position += 1;
 
         match current_char {
             '+' => self.current_token = Token::ADDOP(AddOp::PLUS),
-            '-' => self.current_token = Token::ADDOP(AddOp::MINUS),
+            '-' =>{
+                    if let Some(n) = self.peek() {
+                        match n {
+                            '>' => {
+                                self.current_token = Token::ARROW;
+                                self.position += 1;
+                            }
+                            _ => self.current_token = Token::ADDOP(AddOp::MINUS),
+                        }
+                    }
+                
+                },
             '*' => self.current_token = Token::MULOP(MulOp::MULT),
             '/' => {
                 if let Some(n) = self.peek() {
@@ -221,6 +255,8 @@ impl Lexer {
             }
             _ => panic!("UNRECOGNIZED TOKEN: {}", current_char),
         }
+        return self.current_token;
+
     }
 
     pub fn new(input: &str) -> Result<Lexer, String> {
