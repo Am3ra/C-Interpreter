@@ -654,25 +654,19 @@ impl Interpreter {
     }
 
     fn interpret_statement(&mut self, input: ASTreeNode) -> Result<Token, String> {
-        let mut result = Ok(Token::Type(Type::NONE));
-
         if input.value == Token::RET {
-            result = self.interpret_input(input);
+            self.interpret_input(input)
         } else {
             self.interpret_input(input)?;
+            Ok(Token::Type(Type::NONE))
         }
-
-        result
     }
 
     fn update_var(&mut self, name: &str, value: Token) -> Result<Token, String> {
         for i in self.scope.iter_mut().rev() {
-            match i.get_mut(name) {
-                Some(j) => {
-                    *j = ((j.0).clone(), Some(value.clone()));
-                    return Ok(value);
-                }
-                None => (),
+            if let Some(j) = i.get_mut(name) {
+                *j = ((j.0).clone(), Some(value.clone()));
+                return Ok(value);
             }
         }
         match self.global_vars.get_mut(name) {
@@ -688,24 +682,17 @@ impl Interpreter {
      */
     fn find_var(&mut self, input: &str) -> Option<(Type, Option<Token>)> {
         for i in self.scope.iter_mut().rev() {
-            match i.get(input) {
-                Some(j) => return Some((*j).clone()),
-                None => (),
+            if let Some(j) = i.get(input) {
+                return Some((*j).clone())
             }
         }
         Some((*self.global_vars.get(input)?).clone())
     }
     fn var_declared(&mut self, input: &str) -> bool {
         if let Some(i) = self.scope.last() {
-            match (*i).get(input) {
-                Some(_) => true,
-                None => false,
-            }
+            (*i).get(input).is_some()
         } else {
-            match self.global_vars.get(input) {
-                Some(_) => true,
-                None => false,
-            }
+            self.global_vars.get(input).is_some()
         }
     }
 
@@ -849,7 +836,7 @@ impl Interpreter {
                         }
                     } else {
                         println!("current tree:{:?}", input.clone());
-                        return Err("Interpreting error: can't assign value to non-variable".into());
+                        Err("Interpreting error: can't assign value to non-variable".into())
                     }
                 } else {
                     println!("current tree:{:?}", input.clone());
