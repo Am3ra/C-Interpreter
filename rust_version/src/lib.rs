@@ -527,6 +527,8 @@ impl Parser {
                                     name, func_type, args,
                                 ))));
                                 result.right = Some(Box::new(self.parse_block()?));
+                                // !WARNING, test line
+                                // self.lexer.get_next_token();
                                 Ok(result)
                             } else {
                                 Err("Expected '->' or {".into())
@@ -1251,6 +1253,39 @@ mod parser_tests {
             Parser::new("fn func(){}").unwrap().statement().unwrap()
         );
     }
+
+    #[test]
+    fn parser_basic_function_call() {
+        assert_eq!{
+            ASTreeNode::new(Token::StatementList(vec![
+                ASTreeNode::new_with_values(Token::Type(Type::FUNC), 
+                    Some(Box::new(ASTreeNode::new(Token::FuncData("func".into(),Type::NONE,Vec::new())))), 
+                    Some(Box::new(ASTreeNode::new(Token::StatementList(vec![
+                        ASTreeNode::new_with_values(
+                            Token::RET,
+                            Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
+                            None,
+                        )
+                    ])))))
+                // ,
+                // ASTreeNode::new_with_values(
+                //     Token::RET,
+                //     Some(Box::new(ASTreeNode::new_with_values(
+                //         Token::ArgList(Vec::new()), 
+                //         Some(Box::new(ASTreeNode::new(Token::IDENT("returnThree".into())))), 
+                //         None))),
+                //     None,
+                // )
+            ])),
+            Parser::new("{
+                fn returnThree()->int{
+                    3
+                }
+               
+            }").unwrap().parse_block().unwrap()
+        }
+    }
+
 }
 
 // INTERPRETER TESTS
