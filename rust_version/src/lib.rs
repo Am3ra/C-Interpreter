@@ -597,14 +597,12 @@ impl Parser {
                         None,
                     ));
                     break;
+                } else if self.lexer.current_token == Token::SEMI {
+                    self.lexer.get_next_token();
+                    statements_vec.push(curr);
                 } else {
-                    if self.lexer.current_token == Token::SEMI {
-                        self.lexer.get_next_token();
-                        statements_vec.push(curr);
-                    } else {
-                        println!("{:?}", self.lexer.current_token);
-                        return Err("Expected SEMI".into());
-                    }
+                    println!("{:?}", self.lexer.current_token);
+                    return Err("Expected SEMI".into());
                 }
             }
         }
@@ -617,7 +615,7 @@ impl Parser {
 
             if self.lexer.current_token == Token::RBRACE {
                 self.lexer.get_next_token();
-                return Ok(ASTreeNode::new(Token::StatementList(Vec::new())));
+                Ok(ASTreeNode::new(Token::StatementList(Vec::new())))
             } else {
                 let result = self.statement_list()?;
 
@@ -680,7 +678,7 @@ impl Interpreter {
         match self.global_vars.get_mut(name) {
             Some(j) => {
                 *j = ((j.0).clone(), Some(value.clone()));
-                return Ok(value);
+                Ok(value)
             }
             None => Err("Variable not found/declared".into()),
         }
@@ -723,14 +721,13 @@ impl Interpreter {
                 Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
             }
         } else if let Some(i) = self.scope.last_mut() {
-                match i.insert(name, (var_type, value)) {
-                    None => Ok(()),
-                    Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
-                }
+            match i.insert(name, (var_type, value)) {
+                None => Ok(()),
+                Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
+            }
         } else {
             Err("Unknown Interpreting error, unable to declare var".into())
         }
-        
     }
 
     // fn add(&mut self, input: ASTreeNode) -> Result<Option<Token>, String>

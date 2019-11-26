@@ -1,3 +1,5 @@
 {
-    "maven.view": "hierarchical"
+    "maven.view": "hierarchical",
+    "rust-client.rustupPath": "/Users/alan/.cargo/bin/rustup",
+    "rust-client.rlsPath": "/Users/alan/.cargo/bin/rls",
 }
