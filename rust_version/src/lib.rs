@@ -256,7 +256,7 @@ impl Lexer {
                     }
                 }
             }
-            ','=> self.current_token = Token::COMMA,
+            ',' => self.current_token = Token::COMMA,
             _ => panic!("UNRECOGNIZED TOKEN: {}", current_char),
         }
     }
@@ -329,12 +329,13 @@ impl Parser {
         })
     }
 
-    fn func_call(&mut self) ->Result<Vec<Token>, String>{
+    fn func_call(&mut self) -> Result<Vec<Token>, String> {
         // let result = ASTreeNode::new(Token::ArgList);
-        let mut args:Vec<Token> = Vec::new();
+        let mut args: Vec<Token> = Vec::new();
 
         self.lexer.get_next_token(); // ASSUMING already an LPAREN
-        while self.lexer.current_token != Token::RPAREN || self.lexer.current_token == Token::COMMA {
+        while self.lexer.current_token != Token::RPAREN || self.lexer.current_token == Token::COMMA
+        {
             self.lexer.get_next_token();
             args.push(self.lexer.current_token.clone());
             self.lexer.get_next_token()
@@ -381,8 +382,12 @@ impl Parser {
             }
             Token::IDENT(i) => {
                 self.lexer.get_next_token();
-                if Token::LPAREN == self.lexer.current_token{
-                    return Ok(ASTreeNode::new_with_values(Token::ArgList(self.func_call()?), Some(Box::new(ASTreeNode::new(Token::IDENT(i)))), None));
+                if Token::LPAREN == self.lexer.current_token {
+                    return Ok(ASTreeNode::new_with_values(
+                        Token::ArgList(self.func_call()?),
+                        Some(Box::new(ASTreeNode::new(Token::IDENT(i)))),
+                        None,
+                    ));
                 }
                 Ok(ASTreeNode::new(Token::IDENT(i)))
             }
@@ -499,8 +504,8 @@ impl Parser {
     fn declaration(&mut self) -> Result<ASTreeNode, String> {
         // declaration : type IDENTIFIER [ASSIGN expr] SEMI
 
-        match self.lexer.current_token{
-            Token::Type(Type::FUNC)=>{
+        match self.lexer.current_token {
+            Token::Type(Type::FUNC) => {
                 let mut result = ASTreeNode::new(Token::Type(Type::FUNC));
                 // expect IDENT
                 self.lexer.get_next_token();
@@ -542,9 +547,8 @@ impl Parser {
                 } else {
                     Err("Expected Function Name".into())
                 }
-            },
+            }
             Token::Type(_) => {
-
                 let mut result = ASTreeNode::new(self.lexer.current_token.clone());
                 self.lexer.get_next_token();
 
@@ -563,9 +567,8 @@ impl Parser {
                 } else {
                     return Err("Parsing Error: Expected identifier".into());
                 }
-            
-            },
-            _ => {return Err("Parsing error: Expected type".into())}
+            }
+            _ => return Err("Parsing error: Expected type".into()),
         }
     }
 
@@ -639,8 +642,8 @@ impl Parser {
 
 pub struct Interpreter {
     parser: Parser,
-    global_vars: HashMap<String, (Type,Option<Token>)>,
-    scope: Vec<HashMap<String, (Type,Option<Token>)>>,
+    global_vars: HashMap<String, (Type, Option<Token>)>,
+    scope: Vec<HashMap<String, (Type, Option<Token>)>>,
 }
 
 impl Interpreter {
@@ -668,7 +671,7 @@ impl Interpreter {
         for i in self.scope.iter_mut().rev() {
             match i.get_mut(name) {
                 Some(j) => {
-                    *j = ((j.0).clone(),Some(value.clone()));
+                    *j = ((j.0).clone(), Some(value.clone()));
                     return Ok(value);
                 }
                 None => (),
@@ -676,7 +679,7 @@ impl Interpreter {
         }
         match self.global_vars.get_mut(name) {
             Some(j) => {
-                *j = ((j.0).clone(),Some(value.clone()));
+                *j = ((j.0).clone(), Some(value.clone()));
                 return Ok(value);
             }
             None => Err("Variable not found/declared".into()),
@@ -685,7 +688,7 @@ impl Interpreter {
     /**
      * Search for var in lexical scopes, then global scope.
      */
-    fn find_var(&mut self, input: &str) -> Option<(Type, Option<Token>)>{
+    fn find_var(&mut self, input: &str) -> Option<(Type, Option<Token>)> {
         for i in self.scope.iter_mut().rev() {
             match i.get(input) {
                 Some(j) => return Some((*j).clone()),
@@ -708,15 +711,20 @@ impl Interpreter {
         }
     }
 
-    fn declare_var(&mut self, name: String, var_type:Type,value: Option<Token>) -> Result<(), String> {
+    fn declare_var(
+        &mut self,
+        name: String,
+        var_type: Type,
+        value: Option<Token>,
+    ) -> Result<(), String> {
         if self.scope.is_empty() {
-            match self.global_vars.insert(name, (var_type,value)) {
+            match self.global_vars.insert(name, (var_type, value)) {
                 None => Ok(()),
                 Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
             }
         } else {
             if let Some(i) = self.scope.last_mut() {
-                match i.insert(name, (var_type,value)) {
+                match i.insert(name, (var_type, value)) {
                     None => Ok(()),
                     Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
                 }
@@ -774,7 +782,8 @@ impl Interpreter {
             Token::FLOAT(_) => Ok(input.value),
             Token::IDENT(i) => match self.find_var(&i) {
                 //de-structure result - tuple
-                Some(j) => match j.1 { // match found variable value
+                Some(j) => match j.1 {
+                    // match found variable value
                     Some(k) => Ok(k),
                     None => Err("Interpreting Error: Variable not initialized".into()),
                 },
@@ -804,7 +813,7 @@ impl Interpreter {
                 }
                 for i in list {
                     let mid_result = self.interpret_statement(i)?;
-                    if mid_result  != Token::Type(Type::NONE) {
+                    if mid_result != Token::Type(Type::NONE) {
                         self.scope.pop();
                         return Ok(mid_result);
                     }
@@ -818,9 +827,9 @@ impl Interpreter {
                         return Err("Variable already declared!".into());
                     } else {
                         if let Some(j) = input.right {
-                            self.declare_var(i,var_type, Some((*j).value))?;
+                            self.declare_var(i, var_type, Some((*j).value))?;
                         } else {
-                            self.declare_var(i,var_type, None)?;
+                            self.declare_var(i, var_type, None)?;
                         }
                         Ok(Token::Type(Type::NONE))
                     }
@@ -833,7 +842,7 @@ impl Interpreter {
                 if let Some(i) = input.left.clone() {
                     if let Token::IDENT(j) = (*i).value {
                         if let Some(k) = input.right.clone() {
-                            let inter_value= self.interpret_input(*k)?;
+                            let inter_value = self.interpret_input(*k)?;
                             if inter_value != Token::Type(Type::NONE) {
                                 return Ok(self.update_var(&j, inter_value)?);
                             } else {
@@ -858,14 +867,11 @@ impl Interpreter {
                     Err("Interpreting error: no argument to return statement".into())
                 }
             }
-            Token::FuncData(_i,_j,_k)=>{
+            Token::FuncData(_i, _j, _k) => {
                 //Func declaration
                 Err("Unknown error in function declaration".into())
             }
-            Token::ArgList(_i)=>{
-                Err("Unknown error in function call".into())
-
-            }
+            Token::ArgList(_i) => Err("Unknown error in function call".into()),
             _ => {
                 println!("Current Err ASTNODE: {:?}", input);
                 Err("Interpreting Error: Unknown Token".into())
@@ -971,8 +977,6 @@ mod lexer_tests {
         assert_eq!(lex.current_token, Token::DIGIT(1));
         assert_eq!(lex.peek(), Some('+'))
     }
-
-    
 
     #[test]
     fn lexer_test() {
@@ -1246,20 +1250,25 @@ mod parser_tests {
     #[test]
     fn parser_basic_function() {
         assert_eq!(
-            ASTreeNode::new_with_values(Token::Type(Type::FUNC), 
-                Some(Box::new(ASTreeNode::new(Token::FuncData("func".into(),Type::NONE,Vec::new())))), 
-                Some(Box::new(ASTreeNode::new(Token::StatementList(Vec::new())))))
-            ,
+            ASTreeNode::new_with_values(
+                Token::Type(Type::FUNC),
+                Some(Box::new(ASTreeNode::new(Token::FuncData(
+                    "func".into(),
+                    Type::NONE,
+                    Vec::new()
+                )))),
+                Some(Box::new(ASTreeNode::new(Token::StatementList(Vec::new()))))
+            ),
             Parser::new("fn func(){}").unwrap().statement().unwrap()
         );
     }
 
     #[test]
     fn parser_basic_function_call() {
-        assert_eq!{
+        assert_eq! {
             ASTreeNode::new(Token::StatementList(vec![
-                ASTreeNode::new_with_values(Token::Type(Type::FUNC), 
-                    Some(Box::new(ASTreeNode::new(Token::FuncData("func".into(),Type::NONE,Vec::new())))), 
+                ASTreeNode::new_with_values(Token::Type(Type::FUNC),
+                    Some(Box::new(ASTreeNode::new(Token::FuncData("func".into(),Type::NONE,Vec::new())))),
                     Some(Box::new(ASTreeNode::new(Token::StatementList(vec![
                         ASTreeNode::new_with_values(
                             Token::RET,
@@ -1271,8 +1280,8 @@ mod parser_tests {
                 // ASTreeNode::new_with_values(
                 //     Token::RET,
                 //     Some(Box::new(ASTreeNode::new_with_values(
-                //         Token::ArgList(Vec::new()), 
-                //         Some(Box::new(ASTreeNode::new(Token::IDENT("returnThree".into())))), 
+                //         Token::ArgList(Vec::new()),
+                //         Some(Box::new(ASTreeNode::new(Token::IDENT("returnThree".into())))),
                 //         None))),
                 //     None,
                 // )
@@ -1285,7 +1294,6 @@ mod parser_tests {
             }").unwrap().parse_block().unwrap()
         }
     }
-
 }
 
 // INTERPRETER TESTS
@@ -1309,10 +1317,7 @@ mod interp_test {
     fn interp_basic_add() {
         assert_eq!(
             Token::DIGIT(3),
-            Interpreter::new("1+2")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("1+2").unwrap().interpret_block().unwrap()
         );
     }
 
@@ -1320,10 +1325,7 @@ mod interp_test {
     fn interp_unary_minus() {
         assert_eq!(
             Token::DIGIT(3),
-            Interpreter::new("--3")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("--3").unwrap().interpret_block().unwrap()
         );
     }
 
@@ -1331,10 +1333,7 @@ mod interp_test {
     fn interp_unary_plus() {
         assert_eq!(
             Token::DIGIT(3),
-            Interpreter::new("++3")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("++3").unwrap().interpret_block().unwrap()
         );
     }
 
@@ -1342,10 +1341,7 @@ mod interp_test {
     fn interp_unary_both() {
         assert_eq!(
             Token::DIGIT(3),
-            Interpreter::new("++3")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("++3").unwrap().interpret_block().unwrap()
         );
     }
 
@@ -1395,10 +1391,7 @@ mod interp_test {
     fn interp_basic_interp_plus() {
         assert_eq!(
             Token::DIGIT(3),
-            Interpreter::new("1+2")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("1+2").unwrap().interpret_block().unwrap()
         );
     }
 
@@ -1406,23 +1399,15 @@ mod interp_test {
     fn interp_basic_interp_minus() {
         assert_eq!(
             Token::DIGIT(1),
-            Interpreter::new("2-1")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("2-1").unwrap().interpret_block().unwrap()
         );
     }
-
-    
 
     #[test]
     fn interp_basic_interp_times() {
         assert_eq!(
             Token::DIGIT(6),
-            Interpreter::new("2*3")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("2*3").unwrap().interpret_block().unwrap()
         );
     }
 
@@ -1430,10 +1415,7 @@ mod interp_test {
     fn interp_basic_interp_divide() {
         assert_eq!(
             Token::DIGIT(0),
-            Interpreter::new("2/3")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("2/3").unwrap().interpret_block().unwrap()
         );
     }
 
@@ -1441,10 +1423,7 @@ mod interp_test {
     fn interp_basic_interp_modulo() {
         assert_eq!(
             Token::DIGIT(2),
-            Interpreter::new("2%3")
-                .unwrap()
-                .interpret_block()
-                .unwrap()
+            Interpreter::new("2%3").unwrap().interpret_block().unwrap()
         );
     }
     #[test]
@@ -1554,7 +1533,7 @@ mod interp_test {
 
     #[test]
     fn interp_basic_function_dec() {
-        assert_eq!{
+        assert_eq! {
             Token::DIGIT(3),
             Interpreter::new("{
                 fn returnThree(){
@@ -1565,7 +1544,7 @@ mod interp_test {
     }
     #[test]
     fn interp_basic_function() {
-        assert_eq!{
+        assert_eq! {
             Token::DIGIT(3),
             Interpreter::new("{
                 fn returnThree(){
