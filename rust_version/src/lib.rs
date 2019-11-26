@@ -858,11 +858,11 @@ impl Interpreter {
                     Err("Interpreting error: no argument to return statement".into())
                 }
             }
-            Token::FuncData(i,j,k)=>{
+            Token::FuncData(_i,_j,_k)=>{
                 //Func declaration
                 Err("Unknown error in function declaration".into())
             }
-            Token::ArgList(i)=>{
+            Token::ArgList(_i)=>{
                 Err("Unknown error in function call".into())
 
             }
