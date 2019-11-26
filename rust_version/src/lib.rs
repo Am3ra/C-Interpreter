@@ -560,15 +560,15 @@ impl Parser {
                     if self.lexer.current_token == Token::ASSIGN {
                         self.lexer.get_next_token();
                         result.right = Some(Box::new(self.expr()?));
-                        return Ok(result);
+                        Ok(result)
                     } else {
-                        return Ok(result);
+                        Ok(result)
                     }
                 } else {
-                    return Err("Parsing Error: Expected identifier".into());
+                    Err("Parsing Error: Expected identifier".into())
                 }
             }
-            _ => return Err("Parsing error: Expected type".into()),
+            _ => Err("Parsing error: Expected type".into()),
         }
     }
 
@@ -722,16 +722,15 @@ impl Interpreter {
                 None => Ok(()),
                 Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
             }
-        } else {
-            if let Some(i) = self.scope.last_mut() {
+        } else if let Some(i) = self.scope.last_mut() {
                 match i.insert(name, (var_type, value)) {
                     None => Ok(()),
                     Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
                 }
-            } else {
-                Err("Unknown Interpreting error, unable to declare var".into())
-            }
+        } else {
+            Err("Unknown Interpreting error, unable to declare var".into())
         }
+        
     }
 
     // fn add(&mut self, input: ASTreeNode) -> Result<Option<Token>, String>
@@ -824,7 +823,7 @@ impl Interpreter {
             Token::Type(var_type) => {
                 if let Token::IDENT(i) = (*(input.left.unwrap())).value {
                     if self.var_declared(&i) {
-                        return Err("Variable already declared!".into());
+                        Err("Variable already declared!".into())
                     } else {
                         if let Some(j) = input.right {
                             self.declare_var(i, var_type, Some((*j).value))?;
@@ -844,12 +843,12 @@ impl Interpreter {
                         if let Some(k) = input.right.clone() {
                             let inter_value = self.interpret_input(*k)?;
                             if inter_value != Token::Type(Type::NONE) {
-                                return Ok(self.update_var(&j, inter_value)?);
+                                Ok(self.update_var(&j, inter_value)?)
                             } else {
-                                return Err("Unable to resolve r-value".into());
+                                Err("Unable to resolve r-value".into())
                             }
                         } else {
-                            return Err("No rvalue to assign.".into());
+                            Err("No rvalue to assign.".into())
                         }
                     } else {
                         println!("current tree:{:?}", input.clone());
