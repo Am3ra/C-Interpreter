@@ -1526,7 +1526,7 @@ mod interp_test {
         }
     }
     #[test]
-    fn interp_basic_function() {
+    fn interp_basic_function1() {
         assert_eq! {
             Token::DIGIT(3),
             Interpreter::new("{
