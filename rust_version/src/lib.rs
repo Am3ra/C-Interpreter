@@ -54,7 +54,7 @@ use std::iter::FromIterator;
 //     VAR(Type)
 // }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq,Copy)]
 pub enum Type {
     INT,
     FLOAT,
@@ -86,7 +86,7 @@ pub enum Token {
     COMMA,
     IDENT(String),
     StatementList(Vec<ASTreeNode>),
-    FuncData(String, Type, Vec<(Type, String)>),
+    FuncData(String, Type, Vec<(Type, String)>,Box<ASTreeNode>),
     ArgList(Vec<Token>),
     RET,
     ARROW,
@@ -530,9 +530,8 @@ impl Parser {
                             }
                             if Token::LBRACE == self.lexer.current_token {
                                 result.left = Some(Box::new(ASTreeNode::new(Token::FuncData(
-                                    name, func_type, args,
+                                    name, func_type, args,Box::new(self.parse_block()?)
                                 ))));
-                                result.right = Some(Box::new(self.parse_block()?));
                                 // !WARNING, test line
                                 // self.lexer.get_next_token();
                                 Ok(result)
@@ -760,6 +759,43 @@ impl Interpreter {
             Err("Need at least two values to add".into())
         }
     }
+    // purely lexical checking of types
+    fn check_vars(&self, args: Option<Token>, input: ASTreeNode) -> Result<(), String> {
+        match args {
+            Some(i) => {
+                if let Token::ArgList(j) = (*(input.left.unwrap())).value {
+                    if let Token::FuncData(_, _, n,_) = i {
+                        for it in n.iter().zip(j.iter()) {
+                            let (ai, bi) = it;
+                            match *bi{
+                                Token::DIGIT(_)=> 
+                                    if ai.0 != Type::INT{
+                                        return Err(format!("{} is of incorrect type: Should be {:#?}, is INT",ai.1,ai.0));
+                                    },
+                                Token::FLOAT(_)=>
+                                    if ai.0 != Type::FLOAT{
+                                        return Err(format!("{} is of incorrect type: Should be {:#?}, is FLOAT",ai.1,ai.0));
+                                    },
+                                Token::Type(i)=>
+                                    if ai.0 != i{
+                                        return Err(format!("{} is of incorrect type: Should be {:#?}, is {:#?}",ai.1,ai.0,i));
+                                    },
+                                _=>return Err("unable to check syntaxix of argument.".into())
+                            }
+                        }
+                        return Ok(());
+                    }
+                }
+                Err("Error checking types of arguments".into())
+            }
+            None => Err("Error checking types of arguments".into()),
+        }
+    }
+
+    fn add_args(&mut self, args:Token)->Result<(),String>{
+
+        Ok(())
+    }
 
     fn interpret_input(&mut self, input: ASTreeNode) -> Result<Token, String> {
         match input.clone().value.clone() {
@@ -770,23 +806,34 @@ impl Interpreter {
                     //de-structure result - tuple
                     Some(j) => {
                         if j.0 == Type::FUNC {
-                            // check arg types
-                            // push new scope of scopes
-                            // push new scope to scope of scopes
-                            // add variables from arglist
-                            // return AST
-                        }
-                        match j.1 {
-                            // match found variable value
-                            Some(k) => {
-                                if input.left.is_some() {
-                                } else {
-                                    // Err("Interpreting error, ".into())
-                                }
+                            if let Token::FuncData(_,_,_,m) = j.1.clone().unwrap(){
 
-                                Ok(k)
+                                // check arg types
+                                self.check_vars(j.1.clone(), input.clone())?;
+                                // push new scope of scopes
+                                self.scope.push(Vec::new()); 
+                                // push new scope to scope of scopes
+                                self.scope.last_mut().unwrap().push(HashMap::new());
+                                // add variables from arglist
+                                self.add_args(input.left.unwrap().value)?;
+                                // return AST
+                                Ok(self.interpret_input(*m)?)
+                            }else{
+                                Err("Wrong Token value in Map".into())
                             }
-                            None => Err("Interpreting Error: Variable not initialized".into()),
+                        } else {
+                            match j.1 {
+                                // match found variable value
+                                Some(k) => {
+                                    if input.left.is_some() {
+                                    } else {
+                                        // Err("Interpreting error, ".into())
+                                    }
+
+                                    Ok(k)
+                                }
+                                None => Err("Interpreting Error: Variable not initialized".into()),
+                            }
                         }
                     }
                     None => Err("Interpreting Error: Variable Not Declared".into()),
@@ -837,9 +884,9 @@ impl Interpreter {
                         }
                         Ok(Token::Type(Type::NONE))
                     }
-                } else if let Token::FuncData(i, j, k) = (*(input.left.expect("No L-Value"))).value
+                } else if let Token::FuncData(i, j, k,m) = (*(input.left.expect("No L-Value"))).value
                 {
-                    self.declare_var(i.clone(), var_type, Some(Token::FuncData(i, j, k)))?;
+                    self.declare_var(i.clone(), var_type, Some(Token::FuncData(i, j, k,m)))?;
                     Ok(Token::Type(Type::NONE))
                 } else {
                     Err("Interpreting Error: Expected identifier".into())
@@ -1266,9 +1313,10 @@ mod parser_tests {
                 Some(Box::new(ASTreeNode::new(Token::FuncData(
                     "func".into(),
                     Type::NONE,
-                    Vec::new()
+                    Vec::new(),
+                    Box::new(ASTreeNode::new(Token::StatementList(Vec::new())))
                 )))),
-                Some(Box::new(ASTreeNode::new(Token::StatementList(Vec::new()))))
+                None
             ),
             Parser::new("fn func(){}").unwrap().statement().unwrap()
         );
@@ -1279,15 +1327,15 @@ mod parser_tests {
         assert_eq! {
             ASTreeNode::new(Token::StatementList(vec![
                 ASTreeNode::new_with_values(Token::Type(Type::FUNC),
-                    Some(Box::new(ASTreeNode::new(Token::FuncData("returnThree".into(),Type::INT,Vec::new())))),
-                    Some(Box::new(ASTreeNode::new(Token::StatementList(vec![
+                    Some(Box::new(ASTreeNode::new(Token::FuncData("returnThree".into(),Type::INT,Vec::new(),Box::new(ASTreeNode::new(Token::StatementList(vec![
                         ASTreeNode::new_with_values(
                             Token::RET,
                             Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
                             None,
                         ),
 
-                    ])))))
+                    ]))))))),
+                    None)
                 ,
                 ASTreeNode::new_with_values(
                     Token::RET,
