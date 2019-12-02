@@ -821,7 +821,7 @@ impl Interpreter {
                         return Ok(mid_result);
                     }
                 }
-                self.scope.pop();
+                self.scope.last_mut().unwrap().pop();
                 Ok(Token::Type(Type::NONE))
             }
             Token::Type(var_type) => {
