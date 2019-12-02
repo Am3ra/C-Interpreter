@@ -9,7 +9,7 @@ use std::iter::FromIterator;
  *
  * program : MAIN block
  * block  : LBRACE [statement_list] RBRACE
- * statement_list  : *(statement SEMI|block) [statement [SEMI]]
+ * statement_list  : [(statement [SEMI]|block|function) [statement_list]]
  * statement  : (expr | declaration )  
  * expr : addop *(ASSIGN expr)
  * addop : term *((PLUS/MINUS) expr)
@@ -341,6 +341,7 @@ impl Parser {
             self.lexer.get_next_token()
         }
 
+        self.lexer.get_next_token();
         Ok(args)
     }
 
@@ -384,8 +385,8 @@ impl Parser {
                 self.lexer.get_next_token();
                 if Token::LPAREN == self.lexer.current_token {
                     return Ok(ASTreeNode::new_with_values(
-                        Token::ArgList(self.func_call()?),
-                        Some(Box::new(ASTreeNode::new(Token::IDENT(i)))),
+                        Token::IDENT(i),
+                        Some(Box::new(ASTreeNode::new(Token::ArgList(self.func_call()?)))),
                         None,
                     ));
                 }
@@ -590,18 +591,19 @@ impl Parser {
                 statements_vec.push(self.parse_block()?);
             } else {
                 let curr = self.statement()?;
-                if self.lexer.current_token == Token::RBRACE {
+                if curr.value == Token::Type(Type::FUNC) {
+                    statements_vec.push(curr);
+                } else if self.lexer.current_token == Token::RBRACE {
                     statements_vec.push(ASTreeNode::new_with_values(
                         Token::RET,
                         Some(Box::new(curr)),
                         None,
                     ));
-                    break;
                 } else if self.lexer.current_token == Token::SEMI {
                     self.lexer.get_next_token();
                     statements_vec.push(curr);
                 } else {
-                    println!("{:?}", self.lexer.current_token);
+                    println!("Current Token: {:?}", self.lexer.current_token);
                     return Err("Expected SEMI".into());
                 }
             }
@@ -641,7 +643,7 @@ impl Parser {
 pub struct Interpreter {
     parser: Parser,
     global_vars: HashMap<String, (Type, Option<Token>)>,
-    scope: Vec<HashMap<String, (Type, Option<Token>)>>,
+    scope: Vec<Vec<HashMap<String, (Type, Option<Token>)>>>,
 }
 
 impl Interpreter {
@@ -663,7 +665,7 @@ impl Interpreter {
     }
 
     fn update_var(&mut self, name: &str, value: Token) -> Result<Token, String> {
-        for i in self.scope.iter_mut().rev() {
+        for i in self.scope.last_mut().unwrap().iter_mut().rev() {
             if let Some(j) = i.get_mut(name) {
                 *j = ((j.0).clone(), Some(value.clone()));
                 return Ok(value);
@@ -681,15 +683,15 @@ impl Interpreter {
      * Search for var in lexical scopes, then global scope.
      */
     fn find_var(&mut self, input: &str) -> Option<(Type, Option<Token>)> {
-        for i in self.scope.iter_mut().rev() {
+        for i in self.scope.last_mut().unwrap().iter_mut().rev() {
             if let Some(j) = i.get(input) {
-                return Some((*j).clone())
+                return Some((*j).clone());
             }
         }
         Some((*self.global_vars.get(input)?).clone())
     }
     fn var_declared(&mut self, input: &str) -> bool {
-        if let Some(i) = self.scope.last() {
+        if let Some(i) = self.scope.last().unwrap().last() {
             (*i).get(input).is_some()
         } else {
             self.global_vars.get(input).is_some()
@@ -702,12 +704,12 @@ impl Interpreter {
         var_type: Type,
         value: Option<Token>,
     ) -> Result<(), String> {
-        if self.scope.is_empty() {
+        if self.scope.last().unwrap().is_empty() {
             match self.global_vars.insert(name, (var_type, value)) {
                 None => Ok(()),
                 Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
             }
-        } else if let Some(i) = self.scope.last_mut() {
+        } else if let Some(i) = self.scope.last_mut().unwrap().last_mut() {
             match i.insert(name, (var_type, value)) {
                 None => Ok(()),
                 Some(_) => Err("Interpreting Error: Unable to declare Var.".into()),
@@ -760,18 +762,36 @@ impl Interpreter {
     }
 
     fn interpret_input(&mut self, input: ASTreeNode) -> Result<Token, String> {
-        match input.clone().value {
+        match input.clone().value.clone() {
             Token::DIGIT(_) => Ok(input.value),
             Token::FLOAT(_) => Ok(input.value),
-            Token::IDENT(i) => match self.find_var(&i) {
-                //de-structure result - tuple
-                Some(j) => match j.1 {
-                    // match found variable value
-                    Some(k) => Ok(k),
-                    None => Err("Interpreting Error: Variable not initialized".into()),
-                },
-                None => Err("Interpreting Error: Variable Not Declared".into()),
-            },
+            Token::IDENT(i) => {
+                match self.find_var(&i) {
+                    //de-structure result - tuple
+                    Some(j) => {
+                        if j.0 == Type::FUNC {
+                            // check arg types
+                            // push new scope of scopes
+                            // push new scope to scope of scopes
+                            // add variables from arglist
+                            // return AST
+                        }
+                        match j.1 {
+                            // match found variable value
+                            Some(k) => {
+                                if input.left.is_some() {
+                                } else {
+                                    // Err("Interpreting error, ".into())
+                                }
+
+                                Ok(k)
+                            }
+                            None => Err("Interpreting Error: Variable not initialized".into()),
+                        }
+                    }
+                    None => Err("Interpreting Error: Variable Not Declared".into()),
+                }
+            }
             Token::ADDOP(_) | Token::MULOP(_) => self.add(input),
 
             Token::UNOP(i) => {
@@ -789,7 +809,7 @@ impl Interpreter {
                 }
             }
             Token::StatementList(list) => {
-                self.scope.push(HashMap::new());
+                self.scope.last_mut().unwrap().push(HashMap::new());
                 if list.is_empty() {
                     self.scope.pop();
                     return Ok(Token::Type(Type::NONE));
@@ -805,7 +825,8 @@ impl Interpreter {
                 Ok(Token::Type(Type::NONE))
             }
             Token::Type(var_type) => {
-                if let Token::IDENT(i) = (*(input.left.unwrap())).value {
+                // match *(input.left?)
+                if let Token::IDENT(i) = (*(input.left.clone().expect("No L-Value"))).value {
                     if self.var_declared(&i) {
                         Err("Variable already declared!".into())
                     } else {
@@ -816,6 +837,10 @@ impl Interpreter {
                         }
                         Ok(Token::Type(Type::NONE))
                     }
+                } else if let Token::FuncData(i, j, k) = (*(input.left.expect("No L-Value"))).value
+                {
+                    self.declare_var(i.clone(), var_type, Some(Token::FuncData(i, j, k)))?;
+                    Ok(Token::Type(Type::NONE))
                 } else {
                     Err("Interpreting Error: Expected identifier".into())
                 }
@@ -850,10 +875,10 @@ impl Interpreter {
                     Err("Interpreting error: no argument to return statement".into())
                 }
             }
-            Token::FuncData(_i, _j, _k) => {
-                //Func declaration
-                Err("Unknown error in function declaration".into())
-            }
+            // Token::Type(F) => {
+            //     //Func declaration
+            //     Err("Unknown error in function declaration".into())
+            // }
             Token::ArgList(_i) => Err("Unknown error in function call".into()),
             _ => {
                 println!("Current Err ASTNODE: {:?}", input);
@@ -867,8 +892,11 @@ impl Interpreter {
         self.interpret_input(curr)
     }
     pub fn interpret_program(&mut self) -> Result<Token, String> {
+        self.scope.push(Vec::new());
         let curr = self.parser.parse_block()?;
-        self.interpret_input(curr)
+        let res = self.interpret_input(curr);
+        self.scope.pop();
+        res
     }
 }
 
@@ -1247,33 +1275,34 @@ mod parser_tests {
     }
 
     #[test]
-    fn parser_basic_function_call() {
+    fn basic_function_call() {
         assert_eq! {
             ASTreeNode::new(Token::StatementList(vec![
                 ASTreeNode::new_with_values(Token::Type(Type::FUNC),
-                    Some(Box::new(ASTreeNode::new(Token::FuncData("func".into(),Type::NONE,Vec::new())))),
+                    Some(Box::new(ASTreeNode::new(Token::FuncData("returnThree".into(),Type::INT,Vec::new())))),
                     Some(Box::new(ASTreeNode::new(Token::StatementList(vec![
                         ASTreeNode::new_with_values(
                             Token::RET,
                             Some(Box::new(ASTreeNode::new(Token::DIGIT(3)))),
                             None,
-                        )
+                        ),
+
                     ])))))
-                // ,
-                // ASTreeNode::new_with_values(
-                //     Token::RET,
-                //     Some(Box::new(ASTreeNode::new_with_values(
-                //         Token::ArgList(Vec::new()),
-                //         Some(Box::new(ASTreeNode::new(Token::IDENT("returnThree".into())))),
-                //         None))),
-                //     None,
-                // )
+                ,
+                ASTreeNode::new_with_values(
+                    Token::RET,
+                    Some(Box::new(ASTreeNode::new_with_values(
+                        Token::IDENT("returnThree".into()),
+                        Some(Box::new(ASTreeNode::new(Token::ArgList(Vec::new())))),
+                        None))),
+                    None,
+                )
             ])),
             Parser::new("{
                 fn returnThree()->int{
                     3
                 }
-               
+                returnThree()
             }").unwrap().parse_block().unwrap()
         }
     }
@@ -1517,24 +1546,25 @@ mod interp_test {
     #[test]
     fn interp_basic_function_dec() {
         assert_eq! {
-            Token::DIGIT(3),
+            Token::Type(Type::NONE),
             Interpreter::new("{
-                fn returnThree(){
+                fn returnThree()->int{
                     3
                 }
-            }").unwrap().interpret_block().unwrap()
+            }").unwrap().interpret_program().unwrap()
         }
     }
     #[test]
-    fn interp_basic_function1() {
+    fn interp_basic_function_call() {
         assert_eq! {
             Token::DIGIT(3),
-            Interpreter::new("{
-                fn returnThree(){
+            Interpreter::new("
+            {
+                fn returnThree()->int{
                     3
                 }
                 returnThree()
-            }").unwrap().interpret_block().unwrap()
+            }").unwrap().interpret_program().unwrap()
         }
     }
 }

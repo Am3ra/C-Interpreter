@@ -1,10 +1,10 @@
 {
     "maven.view": "hierarchical",
-    "rust-client.rustupPath": "/Users/alan/.cargo/bin/rustup",
-    "rust-client.rlsPath": "/Users/alan/.cargo/bin/rls",
-    "terminal.integrated.shellArgs.osx": [
-        "-l"
-    ],
+    // "rust-client.rustupPath": "/Users/alan/.cargo/bin/rustup",
+    // "rust-client.rlsPath": "/Users/alan/.cargo/bin/rls",
+    // "terminal.integrated.shellArgs.osx": [
+    //     "-l"
+    // ],
     "lldb.verboseLogging": true,
     "files.exclude": {
         "**/.classpath": true,
@@ -12,5 +12,7 @@
         "**/.settings": true,
         "**/.factorypath": true
     },
-    // "lldb.launch.debugServer": 5281
+    "lldb.showDisassembly": "auto",
+    "lldb.dereferencePointers": true,
+    
 }

@@ -9,16 +9,29 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Cargo test",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": []
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug executable 'rust_version'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=rust_version",
                     "--package=rust_version"
                 ],
                 "filter": {
                     "name": "rust_version",
-                    "kind": "bin"
+                    "kind": "lib"
                 }
             },
             "args": [],
@@ -32,16 +45,35 @@
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=rust_version",
                     "--package=rust_version"
                 ],
                 "filter": {
                     "name": "rust_version",
-                    "kind": "bin"
+                    "kind": "lib"
                 }
             },
             "args": [],
             "cwd": "${workspaceFolder}",
-        }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug interp_basic_function1 in lib.rs",
+            "cargo": {
+              "args": [
+                "test",
+                "--no-run",
+                "--package=rust_version",
+                "--manifest-path=/Users/alan/Documents/C-Interpreter/rust_version/Cargo.toml"
+              ],
+              "filter": {
+                "kind": "lib"
+              }
+            },
+            "args": [
+              "interp_basic_function1"
+            ],
+            "cwd": "/Users/alan/Documents/C-Interpreter/rust_version"
+          }
     ],
 }
