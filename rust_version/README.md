@@ -23,6 +23,7 @@ LE     | ' <='
 GE     | ' >= '
 TYPE   | ' int '
 IDENT  | ' i ' , ' tree '
+FLOW   | ' IF ', ' ELSE ', ' WHILE '
 
 
 
@@ -52,9 +53,16 @@ Pay attention to the definition of statement list, here I'm saying that it is po
 ## Proposed Grammar for future versions:
 name | definition
 ---|---
-function | TYPE IDENTIFIER argument_list block
-argument_list | LPAREN argument  *(COMMA argument)  RPAREN
-argument | TYPE IDENT
-block  | LBRACE [statement_list] RBRACE
+function        | TYPE IDENTIFIER argument_list block
+argument_list   | LPAREN argument  *(COMMA argument)  RPAREN
+argument        | TYPE IDENT
+block           | LBRACE [statement_list] RBRACE
 statement_list  | *(statement SEMI\|block) [statement [SEMI]]
-statement  | (expr \| declaration ) 
+statement       | (expr \| declaration ) 
+if_statement    | IF condition block [else_statement]
+else_statement  | ELSE statement
+while_statement | WHILE condition block
+condition       | statement ? #this is tough...
+boolean         | true \| false
+true            | literally anything but false?
+false           | DIGIT(0), FALSE

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
+
+#![deny(missing_docs)]
+
 /**
  *
  * NOTE: IF IN CAPITALS, CONSUME AND ADVANCE
@@ -47,6 +50,7 @@ use std::iter::FromIterator;
  * TODO: Implement simple namespace
  *      Make types hold values? No... Use relevant token, like digit
  *      figure out type system...
+ *      14/2/2020: Still haven't figured it out
  */
 
 // enum Category{
@@ -61,6 +65,7 @@ pub enum Type {
     STRING,
     FUNC,
     NONE,
+    TYPE
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -91,6 +96,8 @@ pub enum Token {
     RET,
     ARROW,
     Type(Type),
+    IF,
+    ELSE
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -793,7 +800,11 @@ impl Interpreter {
     }
 
     fn add_args(&mut self, args:Token)->Result<(),String>{
-
+        if let Token::ArgList(args)=args{
+            for i in args{
+                // self.declare_var(name: String, var_type: Type, value: Option<Token>)
+            }
+        }
         Ok(())
     }
 
@@ -1018,6 +1029,11 @@ impl Translator {
 mod lexer_tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
+
+    #[test]
+    fn lexer_if() {
+        unimplemented!();
+    }
 
     #[test]
     fn lexer_test_float() {
@@ -1595,7 +1611,8 @@ mod interp_test {
     fn interp_basic_function_dec() {
         assert_eq! {
             Token::Type(Type::NONE),
-            Interpreter::new("{
+            Interpreter::new("
+            {
                 fn returnThree()->int{
                     3
                 }
@@ -1614,5 +1631,26 @@ mod interp_test {
                 returnThree()
             }").unwrap().interpret_program().unwrap()
         }
+    }
+
+    #[test]
+    fn interp_function_vars() {
+        assert_eq!(
+            Token::DIGIT(8),
+            Interpreter::new("
+            {
+                fn returnThree()->int{
+                    int b = 3; 
+                    b = 5;
+                    b+3
+                }
+                returnThree()
+            }").unwrap().interpret_program().unwrap()
+        )
+    }
+
+    #[test]
+    fn interp_recursion() {
+        // assert_eq!(, )
     }
 }
