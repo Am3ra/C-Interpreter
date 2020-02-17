@@ -1,15 +1,15 @@
 #![deny(missing_docs)]
-//! This crate is made as a test of skills of some sort. 
+//! This crate is made as a test of skills of some sort.
 //! It Takes code inputs and returns numeric outputs for the most part.
 use std::collections::HashMap;
+use std::fs;
+use std::io::stdin;
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use std::fs;
-use std::io::stdin;
 
 #[derive(StructOpt, Debug)]
-struct CLI{
+struct CLI {
     #[structopt(short, long)]
     debug: bool,
 
@@ -17,42 +17,42 @@ struct CLI{
     output: Option<PathBuf>,
 }
 
-fn input () -> String
-{
+fn input() -> String {
     let mut ret = String::new();
-    stdin().read_line(&mut ret).expect("Failed to read from stdin");
+    stdin()
+        .read_line(&mut ret)
+        .expect("Failed to read from stdin");
     ret
 }
 
-
- fn main() {
+fn main() {
     let opt = CLI::from_args();
 
-    if opt.debug{
+    if opt.debug {
         println!("{:#?}", opt);
     }
 
-    match opt.output{
-
-        None=>{
-            loop{
-                println!("{:#?}",
-                    Interpreter::new(&input()).unwrap().interpret_block().unwrap()
-                )
-            }
-        },
-        Some(i)=>{
-            println!("{:#?}", Interpreter::new(
-            &fs::read_to_string(i)
-            .expect("Something went wrong reading the file")
-            ).unwrap().interpret_program().unwrap()
+    match opt.output {
+        None => loop {
+            println!(
+                "{:#?}",
+                Interpreter::new(&input())
+                    .unwrap()
+                    .interpret_block()
+                    .unwrap()
             )
-        }
+        },
+        Some(i) => println!(
+            "{:#?}",
+            Interpreter::new(
+                &fs::read_to_string(i).expect("Something went wrong reading the file")
+            )
+            .unwrap()
+            .interpret_program()
+            .unwrap()
+        ),
     }
-
-    
- }
-
+}
 
 /**
  *
@@ -108,14 +108,14 @@ fn input () -> String
 //     VAR(Type)
 // }
 
-#[derive(Clone, Debug, PartialEq,Copy)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 enum Type {
     INT,
     FLOAT,
     _STRING,
     FUNC,
     NONE,
-    _TYPE
+    _TYPE,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -141,13 +141,13 @@ enum Token {
     COMMA,
     IDENT(String),
     StatementList(Vec<ASTreeNode>),
-    FuncData(String, Type, Vec<(Type, String)>,Box<ASTreeNode>),
+    FuncData(String, Type, Vec<(Type, String)>, Box<ASTreeNode>),
     ArgList(Vec<Token>),
     RET,
     ARROW,
     Type(Type),
     _IF,
-    _ELSE
+    _ELSE,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -540,20 +540,29 @@ impl Parser {
                 t = i;
                 self.lexer.get_next_token();
             } else {
-                return Err(format!("Expected type, current token: {:#?}",self.lexer.current_token));
+                return Err(format!(
+                    "Expected type, current token: {:#?}",
+                    self.lexer.current_token
+                ));
             }
 
             if let Token::IDENT(i) = self.lexer.current_token.clone() {
                 result.push((t, i));
                 self.lexer.get_next_token();
             } else {
-                return Err(format!("Expected Identifier, current token: {:#?}",self.lexer.current_token));
+                return Err(format!(
+                    "Expected Identifier, current token: {:#?}",
+                    self.lexer.current_token
+                ));
             }
         }
         // self.lexer.get_next_token();
-        
+
         if Token::RPAREN != self.lexer.current_token {
-            return Err(format!("Expected Identifier, current token: {:#?}",self.lexer.current_token));
+            return Err(format!(
+                "Expected Identifier, current token: {:#?}",
+                self.lexer.current_token
+            ));
         }
         Ok(result)
     }
@@ -578,7 +587,7 @@ impl Parser {
                 // expect IDENT
                 self.lexer.get_next_token();
                 if let Token::IDENT(name) = self.lexer.current_token.clone() {
-                    //Expect PARENS/ARGS LIST                   
+                    //Expect PARENS/ARGS LIST
                     self.lexer.get_next_token();
                     let args = self.get_arg_list()?;
                     let mut func_type = Type::NONE;
@@ -595,7 +604,10 @@ impl Parser {
                     }
                     if Token::LBRACE == self.lexer.current_token {
                         result.left = Some(Box::new(ASTreeNode::new(Token::FuncData(
-                            name, func_type, args,Box::new(self.parse_block()?)
+                            name,
+                            func_type,
+                            args,
+                            Box::new(self.parse_block()?),
                         ))));
                         // !WARNING, test line
                         // self.lexer.get_next_token();
@@ -823,23 +835,35 @@ impl Interpreter {
         match args {
             Some(i) => {
                 if let Token::ArgList(j) = (*(input.left.unwrap())).value {
-                    if let Token::FuncData(_, _, n,_) = i {
+                    if let Token::FuncData(_, _, n, _) = i {
                         for it in n.iter().zip(j.iter()) {
                             let (ai, bi) = it;
-                            match *bi{
-                                Token::DIGIT(_)=> 
-                                    if ai.0 != Type::INT{
-                                        return Err(format!("{} is of incorrect type: Should be {:#?}, is INT",ai.1,ai.0));
-                                    },
-                                Token::FLOAT(_)=>
-                                    if ai.0 != Type::FLOAT{
-                                        return Err(format!("{} is of incorrect type: Should be {:#?}, is FLOAT",ai.1,ai.0));
-                                    },
-                                Token::Type(i)=>
-                                    if ai.0 != i{
-                                        return Err(format!("{} is of incorrect type: Should be {:#?}, is {:#?}",ai.1,ai.0,i));
-                                    },
-                                _=>return Err("unable to check syntaxix of argument.".into())
+                            match *bi {
+                                Token::DIGIT(_) => {
+                                    if ai.0 != Type::INT {
+                                        return Err(format!(
+                                            "{} is of incorrect type: Should be {:#?}, is INT",
+                                            ai.1, ai.0
+                                        ));
+                                    }
+                                }
+                                Token::FLOAT(_) => {
+                                    if ai.0 != Type::FLOAT {
+                                        return Err(format!(
+                                            "{} is of incorrect type: Should be {:#?}, is FLOAT",
+                                            ai.1, ai.0
+                                        ));
+                                    }
+                                }
+                                Token::Type(i) => {
+                                    if ai.0 != i {
+                                        return Err(format!(
+                                            "{} is of incorrect type: Should be {:#?}, is {:#?}",
+                                            ai.1, ai.0, i
+                                        ));
+                                    }
+                                }
+                                _ => return Err("unable to check syntaxix of argument.".into()),
                             }
                         }
                         return Ok(());
@@ -851,9 +875,9 @@ impl Interpreter {
         }
     }
 
-    fn add_args(&mut self, args:Token)->Result<(),String>{
-        if let Token::ArgList(args)=args{
-            for i in args{
+    fn add_args(&mut self, args: Token) -> Result<(), String> {
+        if let Token::ArgList(args) = args {
+            for i in args {
                 // self.declare_var(name: String, var_type: Type, value: Option<Token>)
             }
         }
@@ -869,19 +893,18 @@ impl Interpreter {
                     //de-structure result - tuple
                     Some(j) => {
                         if j.0 == Type::FUNC {
-                            if let Token::FuncData(_,_,_,m) = j.1.clone().unwrap(){
-
+                            if let Token::FuncData(_, _, _, m) = j.1.clone().unwrap() {
                                 // check arg types
                                 self.check_vars(j.1.clone(), input.clone())?;
                                 // push new scope of scopes
-                                self.scope.push(Vec::new()); 
+                                self.scope.push(Vec::new());
                                 // push new scope to scope of scopes
                                 self.scope.last_mut().unwrap().push(HashMap::new());
                                 // add variables from arglist
                                 self.add_args(input.left.unwrap().value)?;
                                 // return AST
                                 Ok(self.interpret_input(*m)?)
-                            }else{
+                            } else {
                                 Err("Wrong Token value in Map".into())
                             }
                         } else {
@@ -947,9 +970,10 @@ impl Interpreter {
                         }
                         Ok(Token::Type(Type::NONE))
                     }
-                } else if let Token::FuncData(i, j, k,m) = (*(input.left.expect("No L-Value"))).value
+                } else if let Token::FuncData(i, j, k, m) =
+                    (*(input.left.expect("No L-Value"))).value
                 {
-                    self.declare_var(i.clone(), var_type, Some(Token::FuncData(i, j, k,m)))?;
+                    self.declare_var(i.clone(), var_type, Some(Token::FuncData(i, j, k, m)))?;
                     Ok(Token::Type(Type::NONE))
                 } else {
                     Err("Interpreting Error: Expected identifier".into())
@@ -1077,8 +1101,6 @@ impl Translator {
     }
 }
 
-
-
 #[cfg(test)]
 mod lexer_tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -1091,7 +1113,6 @@ mod lexer_tests {
 
     #[test]
     fn lexer_test_float() {
-        
         let mut tok = Lexer::new("1.2+2.3").unwrap();
         assert_eq!(Token::FLOAT(1.2), tok.current_token);
         tok.get_next_token();
@@ -1692,7 +1713,8 @@ mod interp_test {
     fn interp_function_vars() {
         assert_eq!(
             Token::DIGIT(8),
-            Interpreter::new("
+            Interpreter::new(
+                "
             {
                 fn returnThree()->int{
                     int b = 3; 
@@ -1700,37 +1722,46 @@ mod interp_test {
                     b+3
                 }
                 returnThree()
-            }").unwrap().interpret_program().unwrap()
+            }"
+            )
+            .unwrap()
+            .interpret_program()
+            .unwrap()
         )
     }
 
     #[test]
-    fn interp_function_args(){
-        let b = Interpreter::new("
+    fn interp_function_args() {
+        let b = Interpreter::new(
+            "
         {
             fn returnArg(int a)->int{
                a
             }
             returnArg(3)
-        }").unwrap().interpret_program().unwrap();
-        assert_eq!(
-            Token::DIGIT(8)
-            , 
-            b
+        }",
         )
+        .unwrap()
+        .interpret_program()
+        .unwrap();
+        assert_eq!(Token::DIGIT(8), b)
     }
-
 
     #[test]
     #[should_panic]
-    fn interp_function_args_type_error(){
-        Interpreter::new("
+    fn interp_function_args_type_error() {
+        Interpreter::new(
+            "
         {
             fn returnArg(int a)->int{
                a
             }
             returnArg(3.5)
-        }").unwrap().interpret_program().unwrap();
+        }",
+        )
+        .unwrap()
+        .interpret_program()
+        .unwrap();
     }
 
     #[test]
