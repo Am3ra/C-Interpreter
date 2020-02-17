@@ -831,11 +831,11 @@ impl Interpreter {
         }
     }
     // purely lexical checking of types
-    fn check_vars(&self, args: Option<Token>, input: ASTreeNode) -> Result<(), String> {
+    fn check_vars(&mut self, args: Option<Token>, input: ASTreeNode) -> Result<(), String> {
         match args {
             Some(i) => {
                 if let Token::ArgList(j) = (*(input.left.unwrap())).value {
-                    if let Token::FuncData(_, _, n, _) = i {
+                    if let Token::FuncData(g, _, n, _) = i.clone() {
                         for it in n.iter().zip(j.iter()) {
                             let (ai, bi) = it;
                             match *bi {
@@ -865,7 +865,9 @@ impl Interpreter {
                                 }
                                 _ => return Err("unable to check syntaxix of argument.".into()),
                             }
+                            self.declare_var(ai.1.clone(), ai.0, Some((*bi).clone()))?;
                         }
+                        self.declare_var(g, Type::FUNC, Some(i))?;
                         return Ok(());
                     }
                 }
@@ -875,14 +877,13 @@ impl Interpreter {
         }
     }
 
-    fn add_args(&mut self, args: Token) -> Result<(), String> {
-        if let Token::ArgList(args) = args {
-            for i in args {
-                // self.declare_var(name: String, var_type: Type, value: Option<Token>)
-            }
-        }
-        Ok(())
-    }
+    // fn add_args(&mut self, args: Token) -> Result<(), String> {
+    //     if let Token::ArgList(args) = args {
+    //         for i in args {
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
     fn interpret_input(&mut self, input: ASTreeNode) -> Result<Token, String> {
         match input.clone().value.clone() {
@@ -894,14 +895,14 @@ impl Interpreter {
                     Some(j) => {
                         if j.0 == Type::FUNC {
                             if let Token::FuncData(_, _, _, m) = j.1.clone().unwrap() {
-                                // check arg types
-                                self.check_vars(j.1.clone(), input.clone())?;
                                 // push new scope of scopes
                                 self.scope.push(Vec::new());
                                 // push new scope to scope of scopes
                                 self.scope.last_mut().unwrap().push(HashMap::new());
+                                // check arg types
+                                self.check_vars(j.1.clone(), input.clone())?;
                                 // add variables from arglist
-                                self.add_args(input.left.unwrap().value)?;
+                                // self. (input.left.unwrap().value)?;
                                 // return AST
                                 Ok(self.interpret_input(*m)?)
                             } else {
@@ -1744,7 +1745,7 @@ mod interp_test {
         .unwrap()
         .interpret_program()
         .unwrap();
-        assert_eq!(Token::DIGIT(8), b)
+        assert_eq!(Token::DIGIT(3), b)
     }
 
     #[test]
