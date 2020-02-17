@@ -5,4 +5,5 @@ authors = ["Alan M"]
 edition = "2018"
 
 [dependencies]
+structopt = "0.3.9"
 # phf = { version = "0.7.24", features = ["macros"] }

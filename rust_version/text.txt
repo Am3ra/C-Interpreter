@@ -1,0 +1,8 @@
+{
+    fn returnThree()->int{
+        int b = 3; 
+        b = 5;
+        b+3
+    }
+    returnThree()
+}

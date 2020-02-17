@@ -1,8 +1,58 @@
+#![deny(missing_docs)]
+//! This crate is made as a test of skills of some sort. 
+//! It Takes code inputs and returns numeric outputs for the most part.
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use std::path::PathBuf;
+use structopt::StructOpt;
+use std::fs;
+use std::io::stdin;
+
+#[derive(StructOpt, Debug)]
+struct CLI{
+    #[structopt(short, long)]
+    debug: bool,
+
+    #[structopt(short, long, parse(from_os_str))]
+    output: Option<PathBuf>,
+}
+
+fn input () -> String
+{
+    let mut ret = String::new();
+    stdin().read_line(&mut ret).expect("Failed to read from stdin");
+    ret
+}
 
 
-#![deny(missing_docs)]
+ fn main() {
+    let opt = CLI::from_args();
+
+    if opt.debug{
+        println!("{:#?}", opt);
+    }
+
+    match opt.output{
+
+        None=>{
+            loop{
+                println!("{:#?}",
+                    Interpreter::new(&input()).unwrap().interpret_block().unwrap()
+                )
+            }
+        },
+        Some(i)=>{
+            println!("{:#?}", Interpreter::new(
+            &fs::read_to_string(i)
+            .expect("Something went wrong reading the file")
+            ).unwrap().interpret_program().unwrap()
+            )
+        }
+    }
+
+    
+ }
+
 
 /**
  *
@@ -59,17 +109,17 @@ use std::iter::FromIterator;
 // }
 
 #[derive(Clone, Debug, PartialEq,Copy)]
-pub enum Type {
+enum Type {
     INT,
     FLOAT,
-    STRING,
+    _STRING,
     FUNC,
     NONE,
-    TYPE
+    _TYPE
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Token {
+enum Token {
     FLOAT(f32),
     DIGIT(i32),
     ADDOP(AddOp),
@@ -96,24 +146,24 @@ pub enum Token {
     RET,
     ARROW,
     Type(Type),
-    IF,
-    ELSE
+    _IF,
+    _ELSE
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum AddOp {
+enum AddOp {
     PLUS,
     MINUS,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum UnaryOp {
+enum UnaryOp {
     PLUS,
     MINUS,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum MulOp {
+enum MulOp {
     MULT,
     DIV,
     MODU,
@@ -293,7 +343,7 @@ impl Lexer {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ASTreeNode {
+struct ASTreeNode {
     value: Token,
     left: Option<Box<ASTreeNode>>,
     right: Option<Box<ASTreeNode>>,
@@ -343,7 +393,7 @@ impl Parser {
         self.lexer.get_next_token(); // ASSUMING already an LPAREN
         while self.lexer.current_token != Token::RPAREN || self.lexer.current_token == Token::COMMA
         {
-            self.lexer.get_next_token();
+            // self.lexer.get_next_token();
             args.push(self.lexer.current_token.clone());
             self.lexer.get_next_token()
         }
@@ -479,21 +529,31 @@ impl Parser {
     }
 
     fn get_arg_list(&mut self) -> Result<Vec<(Type, String)>, String> {
+        if Token::LPAREN != self.lexer.current_token {
+            return Err("expected '('".into());
+        }
+        self.lexer.get_next_token();
         let mut result: Vec<(Type, String)> = Vec::new();
         while self.lexer.current_token != Token::RPAREN {
-            self.lexer.get_next_token();
             let t;
             if let Token::Type(i) = self.lexer.current_token.clone() {
                 t = i;
+                self.lexer.get_next_token();
             } else {
-                return Err("Expected TYPE".into());
+                return Err(format!("Expected type, current token: {:#?}",self.lexer.current_token));
             }
 
             if let Token::IDENT(i) = self.lexer.current_token.clone() {
                 result.push((t, i));
+                self.lexer.get_next_token();
             } else {
-                return Err("Expected identifier".into());
+                return Err(format!("Expected Identifier, current token: {:#?}",self.lexer.current_token));
             }
+        }
+        // self.lexer.get_next_token();
+        
+        if Token::RPAREN != self.lexer.current_token {
+            return Err(format!("Expected Identifier, current token: {:#?}",self.lexer.current_token));
         }
         Ok(result)
     }
@@ -518,38 +578,30 @@ impl Parser {
                 // expect IDENT
                 self.lexer.get_next_token();
                 if let Token::IDENT(name) = self.lexer.current_token.clone() {
-                    //Expect PARENS/ARGS LIST
+                    //Expect PARENS/ARGS LIST                   
                     self.lexer.get_next_token();
-                    if Token::LPAREN == self.lexer.current_token {
+                    let args = self.get_arg_list()?;
+                    let mut func_type = Type::NONE;
+
+                    self.lexer.get_next_token();
+                    if Token::ARROW == self.lexer.current_token {
                         self.lexer.get_next_token();
-                        let args = self.get_arg_list()?;
-                        let mut func_type = Type::NONE;
-                        if Token::RPAREN == self.lexer.current_token {
+                        if let Token::Type(i) = self.lexer.current_token.clone() {
+                            func_type = i;
                             self.lexer.get_next_token();
-                            if Token::ARROW == self.lexer.current_token {
-                                self.lexer.get_next_token();
-                                if let Token::Type(i) = self.lexer.current_token.clone() {
-                                    func_type = i;
-                                    self.lexer.get_next_token();
-                                } else {
-                                    return Err("Expected Type!".into());
-                                }
-                            }
-                            if Token::LBRACE == self.lexer.current_token {
-                                result.left = Some(Box::new(ASTreeNode::new(Token::FuncData(
-                                    name, func_type, args,Box::new(self.parse_block()?)
-                                ))));
-                                // !WARNING, test line
-                                // self.lexer.get_next_token();
-                                Ok(result)
-                            } else {
-                                Err("Expected '->' or {".into())
-                            }
                         } else {
-                            Err("expected ')'".into())
+                            return Err("Expected Type!".into());
                         }
+                    }
+                    if Token::LBRACE == self.lexer.current_token {
+                        result.left = Some(Box::new(ASTreeNode::new(Token::FuncData(
+                            name, func_type, args,Box::new(self.parse_block()?)
+                        ))));
+                        // !WARNING, test line
+                        // self.lexer.get_next_token();
+                        Ok(result)
                     } else {
-                        Err("expected '('".into())
+                        Err("Expected '->' or {".into())
                     }
                 } else {
                     Err("Expected Function Name".into())
@@ -645,11 +697,11 @@ impl Parser {
     //     self.parse_block()
     // }
 }
-
-pub struct Interpreter {
+type Scope = Vec<Vec<HashMap<String, (Type, Option<Token>)>>>;
+struct Interpreter {
     parser: Parser,
     global_vars: HashMap<String, (Type, Option<Token>)>,
-    scope: Vec<Vec<HashMap<String, (Type, Option<Token>)>>>,
+    scope: Scope,
 }
 
 impl Interpreter {
@@ -673,13 +725,13 @@ impl Interpreter {
     fn update_var(&mut self, name: &str, value: Token) -> Result<Token, String> {
         for i in self.scope.last_mut().unwrap().iter_mut().rev() {
             if let Some(j) = i.get_mut(name) {
-                *j = ((j.0).clone(), Some(value.clone()));
+                *j = ((j.0), Some(value.clone()));
                 return Ok(value);
             }
         }
         match self.global_vars.get_mut(name) {
             Some(j) => {
-                *j = ((j.0).clone(), Some(value.clone()));
+                *j = ((j.0), Some(value.clone()));
                 Ok(value)
             }
             None => Err("Variable not found/declared".into()),
@@ -945,7 +997,7 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret_block(&mut self) -> Result<Token, String> {
+    fn interpret_block(&mut self) -> Result<Token, String> {
         let curr = self.parser.statement()?;
         self.interpret_input(curr)
     }
@@ -959,7 +1011,7 @@ impl Interpreter {
 }
 
 #[allow(dead_code)]
-pub struct Translator {
+struct Translator {
     parser: Parser,
 }
 
@@ -1025,6 +1077,8 @@ impl Translator {
     }
 }
 
+
+
 #[cfg(test)]
 mod lexer_tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -1037,6 +1091,7 @@ mod lexer_tests {
 
     #[test]
     fn lexer_test_float() {
+        
         let mut tok = Lexer::new("1.2+2.3").unwrap();
         assert_eq!(Token::FLOAT(1.2), tok.current_token);
         tok.get_next_token();
@@ -1650,7 +1705,36 @@ mod interp_test {
     }
 
     #[test]
+    fn interp_function_args(){
+        let b = Interpreter::new("
+        {
+            fn returnArg(int a)->int{
+               a
+            }
+            returnArg(3)
+        }").unwrap().interpret_program().unwrap();
+        assert_eq!(
+            Token::DIGIT(8)
+            , 
+            b
+        )
+    }
+
+
+    #[test]
+    #[should_panic]
+    fn interp_function_args_type_error(){
+        Interpreter::new("
+        {
+            fn returnArg(int a)->int{
+               a
+            }
+            returnArg(3.5)
+        }").unwrap().interpret_program().unwrap();
+    }
+
+    #[test]
     fn interp_recursion() {
-        // assert_eq!(, )
+        unimplemented!();
     }
 }
