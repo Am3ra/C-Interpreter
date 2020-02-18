@@ -60,20 +60,21 @@ fn main() {
  *
  * Current Grammar:
  *
- * program : MAIN block
- * block  : LBRACE [statement_list] RBRACE
- * statement_list  : [(statement [SEMI]|block|function) [statement_list]]
- * statement  : (expr | declaration )  
- * expr : addop *(ASSIGN expr)
- * addop : term *((PLUS/MINUS) expr)
- * mulop : atom ((MUL/DIV) expr)
- * atom : (PLUS/MINUS) atom |
- *          INTEGER |
- *          LPAREN expr RPAREN
- * declaration : type IDENTIFIER [ASSIGN expr]
- * assignment : identifier ASSIGN expr
- * type : INT|FLOAT //TODO: IMPLEMENT FLOAT
- * identifier : alphabetic *(alphanumeric) //don't know how to write this
+ * program          : MAIN block
+ * block            : LBRACE [statement_list] RBRACE
+ * statement_list   : [(statement [SEMI]|block|function) [statement_list]]
+ * statement        : (expr | declaration | if)  
+ * expr             : addop *(ASSIGN expr)
+ * if               :
+ * addop            : term *((PLUS/MINUS) expr)
+ * mulop            : atom ((MUL/DIV) expr)
+ * atom             : (PLUS/MINUS) atom |
+ *                       INTEGER |
+ *                       LPAREN expr RPAREN
+ * declaration      : type IDENTIFIER [ASSIGN expr]
+ * assignment       : identifier ASSIGN expr
+ * type             : INT|FLOAT //TODO: IMPLEMENT FLOAT
+ * identifier       : alphabetic *(alphanumeric) //don't know how to write this
  * LBRACE = '{'
  * RBRACE = '}'
  * LPAREN = '('
@@ -81,6 +82,7 @@ fn main() {
  * ASSIGN = '='
  * COMMA  = ','
  * MAIN   = 'main'
+ *
  *
  * Proposed Grammar:
  *
@@ -148,7 +150,7 @@ enum Token {
     Type(Type),
     If,
     Else,
-    IfData(Box<ASTreeNode>,Box<ASTreeNode>),
+    IfData(Box<ASTreeNode>),
     ElseData(Box<ASTreeNode>),
 }
 
@@ -647,12 +649,41 @@ impl Parser {
         }
     }
 
+    fn if_statement(&mut self) ->Result<ASTreeNode,String> {
+        //current token is if
+        //grammar: IF expr LBRACE StatementList RBRACE [else_statement]
+        //            ^
+        //Do i need parens? Don't think so.
+        self.lexer.get_next_token();
+
+        let condition = self.expr()?;
+        //grammar: IF expr LBRACE StatementList RBRACE [else_statement]
+        //                  ^
+
+
+        if Token::LBRACE != self.lexer.current_token{
+           return Err(format!("expected '{{' after condition expression.\n Current token: {:#?}",self.lexer.current_token));
+        }
+        
+        let block = self.statement_list()?;
+
+        if Token::RBRACE != self.lexer.current_token{
+            return Err(format!("expected '}}' after condition expression.\n Current token: {:#?}",self.lexer.current_token));
+        } 
+
+        Ok(ASTreeNode::new_with_values(
+            Token::IfData(Box::new(condition)), 
+            Some(Box::new(block)), 
+            None))
+    }
+
     fn statement(&mut self) -> Result<ASTreeNode, String> {
         /*
         statement  : (expr | declaration )
         */
         match self.lexer.current_token.clone() {
-            Token::Type(_i) => self.declaration(),
+            Token::Type(_) => self.declaration(),
+            Token::If=> self.if_statement(),
             _ => self.return_value(),
         }
     }
@@ -677,6 +708,7 @@ impl Parser {
                     self.lexer.get_next_token();
                     statements_vec.push(curr);
                 } else {
+                    println!("CURR: {:#?}", curr);     
                     println!("Current Token: {:?}", self.lexer.current_token);
                     return Err("Expected SEMI".into());
                 }
@@ -1019,6 +1051,24 @@ impl Interpreter {
             //     Err("Unknown error in function declaration".into())
             // }
             Token::ArgList(_i) => Err("Unknown error in function call".into()),
+            Token::IfData(i) => {
+                let condition = self.interpret_input(*i)?;
+                
+                //Only implementing ifs, not elses. Unless...?
+                if condition != Token::DIGIT(0){
+                    if let Some(i) = input.left {
+                        Ok(self.interpret_input(*i)?)
+                    } else {
+                        Err("Interpreting error: No body to if statement".into())
+                    }
+                }else{
+                    if let Some(i) = input.right {
+                        Ok(self.interpret_input(*i)?)
+                    }else{
+                        Ok(Token::Type(Type::NONE))
+                    }
+                }
+            }
             _ => {
                 println!("Current Err ASTNODE: {:?}", input);
                 Err("Interpreting Error: Unknown Token".into())
@@ -1784,15 +1834,35 @@ mod interp_test {
     #[test]
     fn interp_if() {
         assert_eq! {
+            Token::DIGIT(5),
+            Interpreter::new(
+                "
+            {
+                int a = 6;
+                if(1){
+                    return 5;
+                }
+                return 3;
+            }",
+            )
+            .unwrap()
+            .interpret_program()
+            .unwrap()
+        }
+    }
+    #[test]
+    fn interp_else() {
+        assert_eq! {
             Token::DIGIT(3),
             Interpreter::new(
                 "
             {
-                int a = 3;
-                if(a>3){
+                int a = 6;
+                if(1){
                     return 5;
+                }else{
+                    return 3;
                 }
-                return 3;
             }",
             )
             .unwrap()
