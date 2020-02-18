@@ -1113,7 +1113,14 @@ mod lexer_tests {
 
     #[test]
     fn lexer_if() {
-        unimplemented!();
+        let tok = Lexer::new("if").unwrap();
+        assert_eq!(Token::If, tok.current_token);
+    }
+
+    #[test]
+    fn lexer_else() {
+        let tok = Lexer::new("else").unwrap();
+        assert_eq!(Token::Else, tok.current_token);
     }
 
     #[test]
