@@ -146,8 +146,10 @@ enum Token {
     RET,
     ARROW,
     Type(Type),
-    _IF,
-    _ELSE,
+    If,
+    Else,
+    IfData(Box<ASTreeNode>,Box<ASTreeNode>),
+    ElseData(Box<ASTreeNode>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -329,6 +331,8 @@ impl Lexer {
             ("test".into(), Token::EOF),
             ("return".into(), Token::RET),
             ("fn".into(), Token::Type(Type::FUNC)),
+            ("if".into(), Token::If),
+            ("else".into(), Token::Else),
         ]);
         let mut lex = Lexer {
             len: input.len(),
@@ -1768,5 +1772,25 @@ mod interp_test {
     #[test]
     fn interp_recursion() {
         unimplemented!();
+    }
+
+    #[test]
+    fn interp_if() {
+        assert_eq! {
+            Token::DIGIT(3),
+            Interpreter::new(
+                "
+            {
+                int a = 3;
+                if(a>3){
+                    return 5;
+                }
+                return 3;
+            }",
+            )
+            .unwrap()
+            .interpret_program()
+            .unwrap()
+        }
     }
 }
