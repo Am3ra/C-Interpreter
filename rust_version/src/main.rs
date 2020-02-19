@@ -649,7 +649,7 @@ impl Parser {
         }
     }
 
-    fn if_statement(&mut self) ->Result<ASTreeNode,String> {
+    fn if_statement(&mut self) -> Result<ASTreeNode, String> {
         //current token is if
         //grammar: IF expr LBRACE StatementList RBRACE [else_statement]
         //            ^
@@ -660,21 +660,28 @@ impl Parser {
         //grammar: IF expr LBRACE StatementList RBRACE [else_statement]
         //                  ^
 
-
-        if Token::LBRACE != self.lexer.current_token{
-           return Err(format!("expected '{{' after condition expression.\n Current token: {:#?}",self.lexer.current_token));
+        if Token::LBRACE != self.lexer.current_token {
+            return Err(format!(
+                "expected '{{' after condition expression.\n Current token: {:#?}",
+                self.lexer.current_token
+            ));
         }
-        
+        self.lexer.get_next_token();
         let block = self.statement_list()?;
 
-        if Token::RBRACE != self.lexer.current_token{
-            return Err(format!("expected '}}' after condition expression.\n Current token: {:#?}",self.lexer.current_token));
-        } 
+        if Token::RBRACE != self.lexer.current_token {
+            return Err(format!(
+                "expected '}}' after condition expression.\n Current token: {:#?}",
+                self.lexer.current_token
+            ));
+        }
+        self.lexer.get_next_token();
 
         Ok(ASTreeNode::new_with_values(
-            Token::IfData(Box::new(condition)), 
-            Some(Box::new(block)), 
-            None))
+            Token::IfData(Box::new(condition)),
+            Some(Box::new(block)),
+            None,
+        ))
     }
 
     fn statement(&mut self) -> Result<ASTreeNode, String> {
@@ -683,7 +690,7 @@ impl Parser {
         */
         match self.lexer.current_token.clone() {
             Token::Type(_) => self.declaration(),
-            Token::If=> self.if_statement(),
+            Token::If => self.if_statement(),
             _ => self.return_value(),
         }
     }
@@ -696,7 +703,10 @@ impl Parser {
                 statements_vec.push(self.parse_block()?);
             } else {
                 let curr = self.statement()?;
+                
                 if curr.value == Token::Type(Type::FUNC) {
+                    statements_vec.push(curr);
+                } else if let Token::IfData(_) = curr.value.clone(){
                     statements_vec.push(curr);
                 } else if self.lexer.current_token == Token::RBRACE {
                     statements_vec.push(ASTreeNode::new_with_values(
@@ -708,9 +718,9 @@ impl Parser {
                     self.lexer.get_next_token();
                     statements_vec.push(curr);
                 } else {
-                    println!("CURR: {:#?}", curr);     
-                    println!("Current Token: {:?}", self.lexer.current_token);
-                    return Err("Expected SEMI".into());
+                println!("CURR: {:#?}", curr);
+                println!("Current Token: {:?}", self.lexer.current_token);
+                return Err("Expected SEMI".into());
                 }
             }
         }
@@ -913,14 +923,6 @@ impl Interpreter {
         }
     }
 
-    // fn add_args(&mut self, args: Token) -> Result<(), String> {
-    //     if let Token::ArgList(args) = args {
-    //         for i in args {
-    //         }
-    //     }
-    //     Ok(())
-    // }
-
     fn interpret_input(&mut self, input: ASTreeNode) -> Result<Token, String> {
         match input.clone().value.clone() {
             Token::DIGIT(_) => Ok(input.value),
@@ -1053,18 +1055,24 @@ impl Interpreter {
             Token::ArgList(_i) => Err("Unknown error in function call".into()),
             Token::IfData(i) => {
                 let condition = self.interpret_input(*i)?;
-                
                 //Only implementing ifs, not elses. Unless...?
-                if condition != Token::DIGIT(0){
-                    if let Some(i) = input.left {
-                        Ok(self.interpret_input(*i)?)
+                if condition != Token::DIGIT(0) {
+                    if let Token::StatementList(list) = input.left.unwrap().value {
+                        println!("this is the list: \n{:#?}", list);
+                        for i in list {
+                            let mid_result = self.interpret_statement(i)?;
+                            if mid_result != Token::Type(Type::NONE) {
+                                return Ok(mid_result);
+                            }
+                        }
+                        Ok(Token::Type(Type::NONE))
                     } else {
                         Err("Interpreting error: No body to if statement".into())
                     }
-                }else{
+                } else {
                     if let Some(i) = input.right {
                         Ok(self.interpret_input(*i)?)
-                    }else{
+                    } else {
                         Ok(Token::Type(Type::NONE))
                     }
                 }
@@ -1507,6 +1515,53 @@ mod parser_tests {
                 returnThree()
             }").unwrap().parse_block().unwrap()
         }
+    }
+
+    #[test]
+    fn parse_if() {
+        assert_eq!(
+            ASTreeNode::new_with_values(
+                Token::StatementList(vec![
+                    ASTreeNode::new_with_values(
+                        Token::Type(Type::INT),
+                        Some(Box::new(ASTreeNode::new(Token::IDENT("a".into())))),
+                        None)
+                    ,
+                    ASTreeNode::new_with_values(
+                        Token::IfData(Box::new(ASTreeNode::new(Token::DIGIT(1)))),
+                        Some(Box::new(ASTreeNode::new(Token::StatementList(vec![
+                            ASTreeNode::new_with_values(
+                                Token::ASSIGN,
+                                Some(Box::new(ASTreeNode::new(Token::IDENT("a".into())))),
+                                Some(Box::new(ASTreeNode::new(Token::DIGIT(3))))
+                            )
+                        ])))),
+                        None
+                    ),
+                    ASTreeNode::new_with_values(
+                        Token::RET, 
+                        Some(Box::new(ASTreeNode::new(Token::IDENT("a".into())))), 
+                        None)
+                    
+                    ]),
+                None,
+                None
+            ),
+            Parser::new(
+                "
+            {
+                int a;
+                if(1){
+                    a = 3;
+                }
+                return a;
+            }
+            "
+            )
+            .unwrap()
+            .parse_block()
+            .unwrap()
+        )
     }
 }
 
