@@ -772,7 +772,9 @@ impl Interpreter {
     }
 
     fn interpret_statement(&mut self, input: ASTreeNode) -> Result<Token, String> {
-        if input.value == Token::RET {
+        if let Token::IfData(_) = input.value.clone() {
+            self.interpret_input(input)
+        } else if input.value == Token::RET {
             self.interpret_input(input)
         } else {
             self.interpret_input(input)?;
@@ -988,6 +990,7 @@ impl Interpreter {
                 }
                 for i in list {
                     let mid_result = self.interpret_statement(i)?;
+                    
                     if mid_result != Token::Type(Type::NONE) {
                         self.scope.pop();
                         return Ok(mid_result);
@@ -1058,7 +1061,6 @@ impl Interpreter {
                 //Only implementing ifs, not elses. Unless...?
                 if condition != Token::DIGIT(0) {
                     if let Token::StatementList(list) = input.left.unwrap().value {
-                        println!("this is the list: \n{:#?}", list);
                         for i in list {
                             let mid_result = self.interpret_statement(i)?;
                             if mid_result != Token::Type(Type::NONE) {
@@ -1913,7 +1915,7 @@ mod interp_test {
                 "
             {
                 int a = 6;
-                if(1){
+                if(0){
                     return 5;
                 }else{
                     return 3;
