@@ -151,7 +151,7 @@ enum Token {
     IDENT(String),
     StatementList(Vec<ASTreeNode>),
     FuncData(String, Type, Vec<(Type, String)>, Box<ASTreeNode>),
-    ArgList(Vec<Token>),
+    ArgList(Vec<ASTreeNode>),
     RET,
     ARROW,
     Type(Type),
@@ -416,16 +416,14 @@ impl Parser {
         })
     }
 
-    fn func_call(&mut self) -> Result<Vec<Token>, String> {
+    fn func_call(&mut self) -> Result<Vec<ASTreeNode>, String> {
         // let result = ASTreeNode::new(Token::ArgList);
-        let mut args: Vec<Token> = Vec::new();
+        let mut args: Vec<ASTreeNode> = Vec::new();
 
         self.lexer.get_next_token(); // ASSUMING already an LPAREN
         while self.lexer.current_token != Token::RPAREN || self.lexer.current_token == Token::COMMA
         {
-            // self.lexer.get_next_token();
-            args.push(self.lexer.current_token.clone());
-            self.lexer.get_next_token()
+            args.push(self.expr()?);//Error here
         }
 
         self.lexer.get_next_token();
@@ -915,7 +913,7 @@ impl Interpreter {
             Err("Need at least two values to add".into())
         }
     }
-    // purely lexical checking of types
+    // purely lexical checking of types... or is it?
     fn check_vars(&mut self, args: Option<Token>, input: ASTreeNode) -> Result<(), String> {
         match args {
             Some(i) => {
@@ -923,7 +921,8 @@ impl Interpreter {
                     if let Token::FuncData(g, _, n, _) = i.clone() {
                         for it in n.iter().zip(j.iter()) {
                             let (ai, bi) = it;
-                            match *bi {
+                            let bi = self.interpret_input((*bi).clone())?;
+                            match bi {
                                 Token::DIGIT(_) => {
                                     if ai.0 != Type::INT {
                                         return Err(format!(
@@ -948,9 +947,9 @@ impl Interpreter {
                                         ));
                                     }
                                 }
-                                _ => return Err(format!("Unable to check syntax of argument. Token found: {:#?}",*bi)),
+                                _ => return Err(format!("Unable to check syntax of argument. Token found: {:#?}",bi)),
                             }
-                            self.declare_var(ai.1.clone(), ai.0, Some((*bi).clone()))?;
+                            self.declare_var(ai.1.clone(), ai.0, Some(bi))?;
                         }
                         self.declare_var(g, Type::FUNC, Some(i))?;
                         return Ok(());
@@ -1000,7 +999,11 @@ impl Interpreter {
                             }
                         }
                     }
-                    None => Err("Interpreting Error: Variable Not Declared".into()),
+                    None => {
+                        println!("Error var: {:#?}", i);
+                        println!("Error SCOPE: {:#?}", self.scope.last());
+                        Err("Interpreting Error: Variable Not Declared".into())
+                        }
                 }
             }
             Token::ADDOP(_) | Token::MULOP(_) => self.add(input),
