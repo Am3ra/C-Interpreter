@@ -961,6 +961,19 @@ impl Interpreter {
         }
     }
 
+    fn update_args(&mut self, mut input: ASTreeNode)->Result<ASTreeNode,String>{
+        let mut new_vec : Vec<ASTreeNode> = Vec::new();
+        if let Token::ArgList(j) = (*(input.left.unwrap())).value {
+            for arg in j{
+                new_vec.push(ASTreeNode::new(self.interpret_input(arg)?));
+            }
+        } 
+
+        input.left = Some(Box::new(ASTreeNode::new(Token::ArgList(new_vec))));
+
+        Ok(input)
+    }
+
     fn interpret_input(&mut self, input: ASTreeNode) -> Result<Token, String> {
         match input.clone().value.clone() {
             Token::DIGIT(_) => Ok(input.value),
@@ -972,11 +985,13 @@ impl Interpreter {
                         if j.0 == Type::FUNC {
                             if let Token::FuncData(_, _, _, m) = j.1.clone().unwrap() {
                                 // push new scope of scopes
+                                let input_clone = self.update_args(input.clone())?;
+
                                 self.scope.push(Vec::new());
                                 // push new scope to scope of scopes
                                 self.scope.last_mut().unwrap().push(HashMap::new());
                                 // check arg types
-                                self.check_vars(j.1.clone(), input.clone())?;
+                                self.check_vars(j.1.clone(), input_clone)?;
                                 // add variables from arglist
                                 // self. (input.left.unwrap().value)?;
                                 // return AST
