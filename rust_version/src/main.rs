@@ -7,6 +7,7 @@ use std::io::stdin;
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use std::mem::discriminant;
 
 #[derive(StructOpt, Debug)]
 struct CLI {
@@ -120,6 +121,16 @@ enum Type {
     _TYPE,
 }
 
+#[derive(Clone, Debug, PartialEq, Copy)]
+enum Compare{
+    LT,
+    GT,
+    EQ,
+    NE,
+    LE,
+    GE,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Token {
     FLOAT(f32),
@@ -132,12 +143,7 @@ enum Token {
     LBRACE,
     RBRACE,
     SEMI,
-    LT,
-    GT,
-    EQ,
-    // NE,
-    LE,
-    GE,
+    COMPARE(Compare),
     ASSIGN,
     EOF,
     COMMA,
@@ -287,7 +293,7 @@ impl Lexer {
                 if let Some(n) = self.peek() {
                     match n {
                         '=' => {
-                            self.current_token = Token::EQ;
+                            self.current_token = Token::COMPARE(Compare::EQ);
                             self.position += 1;
                         }
                         _ => self.current_token = Token::ASSIGN,
@@ -298,10 +304,10 @@ impl Lexer {
                 if let Some(n) = self.peek() {
                     match n {
                         '=' => {
-                            self.current_token = Token::LE;
+                            self.current_token = Token::COMPARE(Compare::LE);
                             self.position += 1;
                         }
-                        _ => self.current_token = Token::LT,
+                        _ => self.current_token = Token::COMPARE(Compare::LT),
                     }
                 }
             }
@@ -309,14 +315,25 @@ impl Lexer {
                 if let Some(n) = self.peek() {
                     match n {
                         '=' => {
-                            self.current_token = Token::GE;
+                            self.current_token = Token::COMPARE(Compare::GE);
                             self.position += 1;
                         }
-                        _ => self.current_token = Token::GT,
+                        _ => self.current_token = Token::COMPARE(Compare::GT),
                     }
                 }
             }
             ',' => self.current_token = Token::COMMA,
+            '!' => {
+                if let Some(n) = self.peek() {
+                    match n {
+                        '=' => {
+                            self.current_token = Token::COMPARE(Compare::NE);
+                            self.position += 1;
+                        }
+                        _ => panic!("UNRECOGNIZED TOKEN: !{}", current_char),
+                    }
+                }
+            }
             _ => panic!("UNRECOGNIZED TOKEN: {}", current_char),
         }
     }
@@ -461,63 +478,51 @@ impl Parser {
         }
     }
 
-    fn term(&mut self) -> Result<ASTreeNode, String> {
+    fn compare(&mut self) -> Result<ASTreeNode, String> {
         let left = self.atom()?;
 
-        if let Token::MULOP(i) = self.lexer.current_token.clone() {
-            self.lexer.get_next_token();
-            match i {
-                MulOp::MULT => {
-                    return Ok(ASTreeNode::new_with_values(
-                        Token::MULOP(MulOp::MULT),
-                        Some(Box::new(left)),
-                        Some(Box::new(self.expr()?)),
-                    ))
-                }
-                MulOp::DIV => {
-                    return Ok(ASTreeNode::new_with_values(
-                        Token::MULOP(MulOp::DIV),
-                        Some(Box::new(left)),
-                        Some(Box::new(self.expr()?)),
-                    ))
-                }
-                MulOp::MODU => {
-                    return Ok(ASTreeNode::new_with_values(
-                        Token::MULOP(MulOp::MODU),
-                        Some(Box::new(left)),
-                        Some(Box::new(self.expr()?)),
-                    ))
-                }
-            }
-        }
+        let curr = self.lexer.current_token.clone();
 
-        Ok(left)
+        if let Token::COMPARE(_) = self.lexer.current_token {
+            self.lexer.get_next_token();
+            Ok(ASTreeNode::new_with_values(
+                curr,
+                Some(Box::new(left)),
+                Some(Box::new(self.expr()?)),
+            ))
+        }else{
+            Ok(left)
+        }
+    }
+
+    fn term(&mut self) -> Result<ASTreeNode, String> {
+        let left = self.compare()?;
+        let curr = self.lexer.current_token.clone();
+        if let Token::MULOP(_) = self.lexer.current_token {
+            self.lexer.get_next_token();
+            Ok(ASTreeNode::new_with_values(
+                curr,
+                Some(Box::new(left)),
+                Some(Box::new(self.expr()?)),
+            ))
+        }else{
+            Ok(left)
+        }
     }
 
     fn addop(&mut self) -> Result<ASTreeNode, String> {
         let left = self.term()?;
-
-        if let Token::ADDOP(i) = self.lexer.current_token.clone() {
+        let curr = self.lexer.current_token.clone();
+        if let Token::ADDOP(_) = self.lexer.current_token {
             self.lexer.get_next_token();
-            match i {
-                AddOp::PLUS => {
-                    return Ok(ASTreeNode::new_with_values(
-                        Token::ADDOP(AddOp::PLUS),
-                        Some(Box::new(left)),
-                        Some(Box::new(self.expr()?)),
-                    ))
-                }
-                AddOp::MINUS => {
-                    return Ok(ASTreeNode::new_with_values(
-                        Token::ADDOP(AddOp::MINUS),
-                        Some(Box::new(left)),
-                        Some(Box::new(self.expr()?)),
-                    ))
-                }
-            }
+            Ok(ASTreeNode::new_with_values(
+                curr,
+                Some(Box::new(left)),
+                Some(Box::new(self.expr()?)),
+            ))
+        }else{
+            Ok(left)
         }
-
-        Ok(left)
     }
 
     fn expr(&mut self) -> Result<ASTreeNode, String> {
