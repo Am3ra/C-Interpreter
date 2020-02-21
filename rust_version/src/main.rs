@@ -7,7 +7,7 @@ use std::io::stdin;
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use std::mem::discriminant;
+// use std::mem::discriminant;
 
 #[derive(StructOpt, Debug)]
 struct CLI {
@@ -119,6 +119,7 @@ enum Type {
     FUNC,
     NONE,
     _TYPE,
+    // BOOL
 }
 
 #[derive(Clone, Debug, PartialEq, Copy)]
@@ -157,6 +158,7 @@ enum Token {
     If,
     Else,
     IfData(Box<ASTreeNode>),
+    BOOL(Bool)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -176,6 +178,12 @@ enum MulOp {
     MULT,
     DIV,
     MODU,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Bool{
+    True,
+    False
 }
 
 struct Lexer {
@@ -478,25 +486,8 @@ impl Parser {
         }
     }
 
-    fn compare(&mut self) -> Result<ASTreeNode, String> {
-        let left = self.atom()?;
-
-        let curr = self.lexer.current_token.clone();
-
-        if let Token::COMPARE(_) = self.lexer.current_token {
-            self.lexer.get_next_token();
-            Ok(ASTreeNode::new_with_values(
-                curr,
-                Some(Box::new(left)),
-                Some(Box::new(self.expr()?)),
-            ))
-        }else{
-            Ok(left)
-        }
-    }
-
     fn term(&mut self) -> Result<ASTreeNode, String> {
-        let left = self.compare()?;
+        let left = self.atom()?;
         let curr = self.lexer.current_token.clone();
         if let Token::MULOP(_) = self.lexer.current_token {
             self.lexer.get_next_token();
@@ -525,8 +516,25 @@ impl Parser {
         }
     }
 
-    fn expr(&mut self) -> Result<ASTreeNode, String> {
+    fn compare(&mut self) -> Result<ASTreeNode, String> {
         let left = self.addop()?;
+
+        let curr = self.lexer.current_token.clone();
+
+        if let Token::COMPARE(_) = self.lexer.current_token {
+            self.lexer.get_next_token();
+            Ok(ASTreeNode::new_with_values(
+                curr,
+                Some(Box::new(left)),
+                Some(Box::new(self.expr()?)),
+            ))
+        }else{
+            Ok(left)
+        }
+    }
+
+    fn expr(&mut self) -> Result<ASTreeNode, String> {
+        let left = self.compare ()?;
         if Token::ASSIGN == self.lexer.current_token {
             self.lexer.get_next_token();
             return Ok(ASTreeNode::new_with_values(
@@ -1107,6 +1115,53 @@ impl Interpreter {
                         Ok(Token::Type(Type::NONE))
                     }
                 }
+            }
+            Token::COMPARE(i) => {
+                match i{
+                    Compare::EQ => {
+                        if let Some(j) = input.left{
+                            if let Some(k) = input.right {
+                                if (*j).value == (*k).value{
+                                    Ok(Token::BOOL(Bool::True))
+                                }else{
+                                    Ok(Token::BOOL(Bool::False))
+                                }
+                            }else{
+                                Err(format!("Error, no right value in comparison:"))
+                            }
+                        }else{
+                            Err(format!("Error, no left value in comparison:"))
+                        }
+                    }
+                    Compare::GE => {
+                        Err("UNIMPLEMENTED".into())
+                    }
+                    Compare::GT => {
+                        Err("UNIMPLEMENTED".into())
+                    }
+                    Compare::LE => {
+                        Err("UNIMPLEMENTED".into())
+                    }
+                    Compare::LT => {
+                        Err("UNIMPLEMENTED".into())
+                    }
+                    Compare::NE => {
+                        if let Some(j) = input.left{
+                            if let Some(k) = input.right {
+                                if (*j).value != (*k).value{
+                                    Ok(Token::BOOL(Bool::True))
+                                }else{
+                                    Ok(Token::BOOL(Bool::False))
+                                }
+                            }else{
+                                Err(format!("Error, no right value in comparison: "))
+                            }
+                        }else{
+                            Err(format!("Error, no left value in comparison: "))
+                        }
+                    }
+                }
+
             }
             _ => {
                 println!("Current Err ASTNODE: {:?}", input);

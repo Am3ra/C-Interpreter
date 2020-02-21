@@ -1,8 +1,10 @@
 {
-    fn returnThree()->int{
-        int b = 3; 
-        b = 5;
-        b+3
+    fn factorial(int a)->int{
+       if (a){
+           return a * factorial(a-1)
+       }else{
+           return 1
+       }
     }
-    returnThree()
+    factorial(5)
 }
