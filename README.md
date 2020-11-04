@@ -1,3 +1,5 @@
+![Rust](https://github.com/Am3ra/C-Interpreter/workflows/Rust/badge.svg)
+
 # Cyclone
 Writing and Improvising a C-Clone interpreter 
 
