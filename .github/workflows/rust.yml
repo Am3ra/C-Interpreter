@@ -13,12 +13,14 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    env:
+      working-directory: ./rust_version
 
     steps:
-    - name: change directory
-      run: cd rust_version 
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
+      working-directory: ./rust_version
     - name: Run tests
       run: cargo test --verbose
+      working-directory: ./rust_version
